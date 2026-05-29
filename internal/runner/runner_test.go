@@ -61,6 +61,18 @@ func opts() Options {
 	return Options{StopModuleOnFailure: true, Log: zerolog.Nop(), Cache: cache.Noop{}}
 }
 
+// TestStepRunsInModuleDirWithEnv guards REQUESTED.md #6/#7: steps run in the
+// module's directory and FRODO_IMAGE / FRODO_MODULE_DIR are injected.
+func TestStepRunsInModuleDirWithEnv(t *testing.T) {
+	check := `test "$(basename "$PWD")" = alpha && test -n "$FRODO_IMAGE" && test -n "$FRODO_MODULE_DIR"`
+	loaded := repoWithSteps(t, check, "echo ok")
+	res := New(loaded, opts()).Run(context.Background(), manualPlan(loaded, "validate"), "all")
+	if !res.Success {
+		t.Fatalf("step should run in module dir with FRODO_IMAGE/FRODO_MODULE_DIR set; got %s: %+v",
+			res.Summary(), res.Stages)
+	}
+}
+
 func TestRunSuccess(t *testing.T) {
 	loaded := repoWithSteps(t, "echo validate-ok", "echo test-ok")
 	res := New(loaded, opts()).Run(context.Background(), manualPlan(loaded, "validate", "test"), "all")

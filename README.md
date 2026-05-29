@@ -51,10 +51,11 @@ through **one** standard workflow and **one** required merge check.
 - **Go 1.25+** to build from source (`GOTOOLCHAIN=auto` will fetch it if your
   local Go is older).
 - **git** — used for change detection.
-- To actually *execute* stages with `frodo-ci run`, the target repo's build
-  tools must be present (e.g. `mvnw`, `pnpm`, `docker`). Frodo CI runs your
-  steps; it does not install language toolchains itself (the GitHub workflow's
-  `setup-*` steps, or your machine, provide those).
+- To actually *execute* stages with `frodo-ci run`, the build tools the steps
+  call must be present. Frodo CI runs your steps; it does not install language
+  toolchains itself. The workflow `frodo-ci init` generates already includes
+  `setup-java` + `setup-node` + corepack (matching the stock templates) — trim
+  what your repo doesn't use and add others (e.g. `setup-go`).
 
 ## Install
 
@@ -140,14 +141,29 @@ depends_on:
 Optional `.ci/<stage>.yml` files override a stage's steps when the template is
 not enough.
 
+### Stage environment
+
+Each step runs **in its module's directory** by default (override per step with
+`working_directory`), with these variables exported so templates need no
+hard-coded paths:
+
+| Variable | Value |
+|---|---|
+| `FRODO_MODULE` | module name (e.g. `cards`) |
+| `FRODO_MODULE_PATH` | repo-relative module dir (e.g. `services/cards`) |
+| `FRODO_MODULE_DIR` | absolute module dir |
+| `FRODO_REPO_ROOT` | absolute repo root (e.g. for `cd "$FRODO_REPO_ROOT" && ./mvnw -pl "$FRODO_MODULE_PATH"`) |
+| `FRODO_STAGE` / `FRODO_ENVIRONMENT` | current stage / target environment |
+| `FRODO_IMAGE` | `<prefix><module>:<tag>` for build/push; set `images.prefix` in the root config to add a registry, and override per stage via `env:` |
+
 ## Commands
 
 Run any command with `--help` for details. Global flags apply to all of them.
 
 | Command | What it does |
 |---|---|
-| `init` | Scaffold Frodo CI into the repository |
-| `init-module --name --type --path --owner` | Scaffold a module's `.ci/module.yml` |
+| `init` | Scaffold Frodo CI into the repository (`--action-ref` for forks; `--force`) |
+| `init-module --name --type --path --owner` | Scaffold a module's `.ci/module.yml` (`--depends-on m[:affects=a,b]` repeatable; `--force`) |
 | `validate-config` | Validate config against the JSON Schemas |
 | `lint-config` | Semantic linting (cycles, broad inputs, weakening, ...) |
 | `plan` | Calculate and print the execution plan |
@@ -220,8 +236,10 @@ Be aware of these before adopting it to gate merges:
 - **Security scanning decides, it does not fully enforce.** It correctly selects
   which scans to run per change type and invokes a tool if installed, but does
   not yet parse each tool's findings (SARIF) and block on them.
-- **No toolchain provisioning.** `run` executes your steps assuming the tools
-  exist; installing JDK/Node/etc. is the workflow's or host's job.
+- **No in-process toolchain provisioning.** `run` executes your steps assuming
+  the tools exist. The generated workflow scaffolds `setup-java`/`setup-node`
+  for the stock templates, but installing toolchains is the workflow's job —
+  adjust it for other languages.
 - **GitHub/Slack features need credentials** (`GITHUB_TOKEN`, `SLACK_WEBHOOK_URL`)
   and a PR context to do anything; locally they degrade gracefully.
 
