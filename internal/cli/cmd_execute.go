@@ -78,6 +78,7 @@ func (a *App) runExecute(ctx context.Context, group string) error {
 	result := runner.New(loaded, opts).Run(ctx, p, group)
 
 	budgetExceeded := a.reportRun(loaded, p, result)
+	a.publishReport(ctx, loaded, p, result)
 
 	if a.JSON {
 		if err := writeJSON(a.Out, result); err != nil {

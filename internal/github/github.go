@@ -221,6 +221,32 @@ func (c *Client) ListTeamMembers(ctx context.Context, slug string) ([]string, er
 	return out, nil
 }
 
+// UpsertComment posts body as a PR comment, updating the existing Frodo CI
+// comment (identified by marker) instead of adding a new one on each run.
+func (c *Client) UpsertComment(ctx context.Context, marker, body string) error {
+	opt := &gh.IssueListCommentsOptions{ListOptions: gh.ListOptions{PerPage: 100}}
+	for {
+		comments, resp, err := c.api.Issues.ListComments(ctx, c.ctx.Owner, c.ctx.Repo, c.ctx.PRNumber, opt)
+		if err != nil {
+			return err
+		}
+		for _, cm := range comments {
+			if strings.Contains(cm.GetBody(), marker) {
+				_, _, err := c.api.Issues.EditComment(ctx, c.ctx.Owner, c.ctx.Repo, cm.GetID(),
+					&gh.IssueComment{Body: ptr(body)})
+				return err
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+	_, _, err := c.api.Issues.CreateComment(ctx, c.ctx.Owner, c.ctx.Repo, c.ctx.PRNumber,
+		&gh.IssueComment{Body: ptr(body)})
+	return err
+}
+
 func isBot(userType, login string) bool {
 	return userType == "Bot" || strings.HasSuffix(login, "[bot]")
 }

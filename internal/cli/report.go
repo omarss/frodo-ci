@@ -1,15 +1,113 @@
 package cli
 
 import (
+	"context"
 	"os"
+	"strconv"
 
 	"github.com/omarss/frodo-ci/internal/config"
 	"github.com/omarss/frodo-ci/internal/github"
 	"github.com/omarss/frodo-ci/internal/perf"
 	"github.com/omarss/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/report"
 	"github.com/omarss/frodo-ci/internal/runner"
 	"github.com/omarss/frodo-ci/internal/slack"
 )
+
+// publishReport renders the run summary (what failed, why it ran, how to fix)
+// to the GitHub step summary and, on a pull request, upserts it as a single PR
+// comment so failures are obvious without digging through logs.
+func (a *App) publishReport(ctx context.Context, loaded *plan.Loaded, p *plan.Plan, res *runner.Result) {
+	md := report.BuildComment(a.buildReportInput(loaded, p, res))
+
+	if path := os.Getenv("GITHUB_STEP_SUMMARY"); path != "" {
+		if f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+			_, _ = f.WriteString(md + "\n")
+			_ = f.Close()
+		}
+	}
+
+	gh := github.FromEnv()
+	if gh.Enabled() && gh.HasPR() {
+		if err := github.NewClient(ctx, gh).UpsertComment(ctx, report.Marker, md); err != nil {
+			a.Log.Warn().Err(err).Msg("could not post PR summary comment")
+		}
+	}
+}
+
+func (a *App) buildReportInput(loaded *plan.Loaded, p *plan.Plan, res *runner.Result) report.Input {
+	reasons := map[string][]string{}
+	for _, m := range p.Modules {
+		for _, s := range m.Stages {
+			reasons[m.Name+"/"+s.Stage] = s.Reasons
+		}
+	}
+	var stages []report.StageReport
+	for _, s := range res.Stages {
+		sr := report.StageReport{
+			Module: s.Module, Stage: s.Stage, Status: string(s.Status),
+			Note: s.Note, Duration: s.Duration, Reasons: reasons[s.Module+"/"+s.Stage],
+			Owners: ownerMentions(loaded, s.Module),
+		}
+		if step := lastFailedStep(s.Steps); step != nil {
+			sr.FailedStep = step.Name
+			if sr.FailedStep == "" {
+				sr.FailedStep = s.Stage
+			}
+			sr.FailReason = "exit " + strconv.Itoa(step.ExitCode)
+			if step.TimedOut {
+				sr.FailReason = "timed out"
+			}
+			sr.Output = step.Output
+			sr.ReproduceCmd, sr.ReproduceDir = reproduce(loaded, s.Module, s.Stage, len(s.Steps)-1)
+		}
+		stages = append(stages, sr)
+	}
+	return report.Input{SHA: github.FromEnv().SHA, Stages: stages}
+}
+
+func ownerMentions(loaded *plan.Loaded, module string) []string {
+	m := loaded.FindModule(module)
+	if m == nil {
+		return nil
+	}
+	var out []string
+	for _, t := range m.Config.Owners.Teams {
+		out = append(out, "@"+t)
+	}
+	for _, u := range m.Config.Owners.Users {
+		out = append(out, "@"+u)
+	}
+	return out
+}
+
+func lastFailedStep(steps []runner.StepResult) *runner.StepResult {
+	var found *runner.StepResult
+	for i := range steps {
+		if steps[i].Err != "" {
+			found = &steps[i]
+		}
+	}
+	return found
+}
+
+// reproduce returns the exact command and directory to re-run a failed step.
+func reproduce(loaded *plan.Loaded, module, stage string, idx int) (cmd, dir string) {
+	m := loaded.FindModule(module)
+	if m == nil || idx < 0 {
+		return "", ""
+	}
+	es, ok := loaded.EffectiveStages(m)[stage]
+	if !ok || idx >= len(es.Steps) {
+		return "", ""
+	}
+	step := es.Steps[idx]
+	dir = step.WorkingDirectory
+	if dir == "" {
+		dir = m.Dir
+	}
+	return step.Run, dir
+}
 
 // reportRun emits the performance summary and Slack notifications after a run.
 // It returns true when a budget was exceeded and the config fails on that.
