@@ -108,6 +108,11 @@ func anyToStrings(vals []any) []string {
 	return out
 }
 
+// Suggest returns the closest candidate to word within an edit-distance budget,
+// or "" when nothing is close enough. Exposed for the semantic linter so its
+// "did you mean" hints match the validator's.
+func Suggest(word string, candidates []string) string { return suggest(word, candidates) }
+
 // suggest returns the closest candidate to word within an edit-distance budget,
 // or "" when nothing is close enough to be a helpful suggestion.
 func suggest(word string, candidates []string) string {

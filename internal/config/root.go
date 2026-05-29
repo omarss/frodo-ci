@@ -5,7 +5,7 @@ type RootConfig struct {
 	Version        int             `yaml:"version" json:"version"`
 	ModuleFile     string          `yaml:"module_file,omitempty" json:"module_file,omitempty"`
 	Scan           ScanConfig      `yaml:"scan,omitempty" json:"scan,omitempty"`
-	Stages         StagesConfig    `yaml:"stages" json:"stages"`
+	Stages         StagesConfig    `yaml:"stages,omitempty" json:"stages,omitempty"`
 	Modules        ModulesConfig   `yaml:"modules,omitempty" json:"modules,omitempty"`
 	Templates      TemplatesConfig `yaml:"templates,omitempty" json:"templates,omitempty"`
 	Execution      ExecutionConfig `yaml:"execution,omitempty" json:"execution,omitempty"`
@@ -27,7 +27,7 @@ type ScanConfig struct {
 
 // StagesConfig declares the canonical CI and CD stage order.
 type StagesConfig struct {
-	CI []string `yaml:"ci" json:"ci"`
+	CI []string `yaml:"ci,omitempty" json:"ci,omitempty"`
 	CD []string `yaml:"cd,omitempty" json:"cd,omitempty"`
 }
 

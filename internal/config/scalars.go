@@ -21,6 +21,12 @@ func (d Duration) Duration() time.Duration { return time.Duration(d) }
 
 func (d Duration) String() string { return time.Duration(d).String() }
 
+// MarshalJSON renders the duration as its human string (e.g. "20m0s") so plan
+// output and reports are readable.
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + d.String() + `"`), nil
+}
+
 // UnmarshalYAML accepts a scalar duration string.
 func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var s string

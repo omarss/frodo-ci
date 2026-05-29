@@ -53,6 +53,21 @@ func (g *Git) Untracked() ([]string, error) {
 	return splitLines(out), nil
 }
 
+// ListFiles returns every tracked and untracked (non-ignored) file in the
+// working tree, repo-relative and sorted. Used to enumerate a stage's input
+// surface for fingerprinting.
+func (g *Git) ListFiles() ([]string, error) {
+	tracked, err := g.run("ls-files")
+	if err != nil {
+		return nil, err
+	}
+	untracked, err := g.Untracked()
+	if err != nil {
+		return nil, err
+	}
+	return dedupeSort(append(splitLines(tracked), untracked...)), nil
+}
+
 // MergeBase returns the best common ancestor of two refs.
 func (g *Git) MergeBase(a, b string) (string, error) {
 	out, err := g.run("merge-base", a, b)

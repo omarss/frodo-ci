@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/frodo-ci/frodo-ci/internal/configlint"
+	"github.com/frodo-ci/frodo-ci/internal/plan"
 	"github.com/frodo-ci/frodo-ci/internal/schema"
 )
 
@@ -114,13 +117,48 @@ func messagesOf(err error) []string {
 }
 
 // newLintConfigCommand runs semantic linting beyond structural schema checks.
-func newLintConfigCommand(_ *App) *cobra.Command {
+func newLintConfigCommand(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "lint-config",
 		Short: "Lint configuration for semantic problems (cycles, broad inputs, weakening, ...)",
 		Args:  cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci lint-config")
+			return app.runLintConfig()
 		},
 	}
+}
+
+func (a *App) runLintConfig() error {
+	loaded, err := plan.Load(a.RepoRoot, time.Now())
+	if err != nil {
+		return err
+	}
+	problems := loaded.SemanticProblems
+	if a.JSON {
+		if err := writeJSON(a.Out, problems); err != nil {
+			return err
+		}
+		if configlint.HasErrors(problems) {
+			return ErrExitQuiet
+		}
+		return nil
+	}
+	if len(problems) == 0 {
+		fmt.Fprintln(a.Out, "no semantic problems found")
+		return nil
+	}
+	printProblems(a.Out, problems)
+	errs, warns := 0, 0
+	for _, p := range problems {
+		if p.Severity == configlint.Error {
+			errs++
+		} else {
+			warns++
+		}
+	}
+	fmt.Fprintf(a.Out, "\n%d error(s), %d warning(s)\n", errs, warns)
+	if errs > 0 {
+		return ErrExitQuiet
+	}
+	return nil
 }
