@@ -77,14 +77,19 @@ func (a *App) runExecute(ctx context.Context, group string) error {
 	opts.Scanner = a.buildScanner(loaded, p)
 	result := runner.New(loaded, opts).Run(ctx, p, group)
 
+	budgetExceeded := a.reportRun(loaded, p, result)
+
 	if a.JSON {
 		if err := writeJSON(a.Out, result); err != nil {
 			return err
 		}
 	} else {
 		a.printResult(result)
+		if budgetExceeded {
+			fmt.Fprintln(a.Out, "performance budget exceeded")
+		}
 	}
-	if !result.Success {
+	if !result.Success || budgetExceeded {
 		return ErrExitQuiet
 	}
 	return nil

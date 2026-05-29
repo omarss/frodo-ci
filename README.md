@@ -158,12 +158,18 @@ This repository implements the deterministic core end to end:
 - ✅ Templates, quality profiles, ad-hoc command detection
 - ✅ Stage execution engine (bounded parallelism, timeouts, fail-fast)
 - ✅ `init`/`init-module`/`doctor` and the embedded scaffolding
+- ✅ GitHub dynamic check-runs + review/expert enforcement (`go-github`)
+- ✅ Smart security scanning + anti-weakening + protected-file governance
+- ✅ Performance budgets/regression + deduplicated Slack notifications
 
-Integration layers wired against their real client libraries and being filled in:
+The deterministic decision logic for every layer is implemented and unit-tested.
+The thin I/O edges that require external systems are wired against their real
+clients but can only be exercised with live credentials/tooling:
 
-- ◑ GitHub dynamic check-runs + review/expert enforcement (`go-github`)
-- ◑ Smart security scanning orchestration + anti-weakening + protected files
-- ◑ Performance budgets/regression reporting + Slack notifications
+- GitHub API calls (check-runs, reviews, permissions) need `GITHUB_TOKEN`
+- Slack delivery needs `SLACK_WEBHOOK_URL`
+- security scanners (trivy, semgrep, gitleaks, hadolint, ...) run when installed
+- the cache directory is persisted across CI runs via `actions/cache`
 
 ## License
 

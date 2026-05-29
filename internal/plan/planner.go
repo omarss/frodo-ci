@@ -42,6 +42,7 @@ type Catalog struct {
 	SuppressionsPath        string
 	LintRules               *config.LintRules
 	LintRulesVersion        int
+	PerformanceBudgets      *config.PerformanceBudgets
 	TemplatesDir            string
 	sources                 []kindedSource
 }
@@ -180,7 +181,7 @@ func loadCatalog(repoRoot string, root *config.RootConfig) *Catalog {
 		c.sources = append(c.sources, kindedSource{schema.KindLint, src})
 	}
 	if pb, src, err := config.LoadPerformanceBudgets(filepath.Join(base, "performance", "budgets.yml")); err == nil {
-		_ = pb
+		c.PerformanceBudgets = pb
 		c.sources = append(c.sources, kindedSource{schema.KindPerformance, src})
 	}
 	return c
