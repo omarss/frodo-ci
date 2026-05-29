@@ -36,6 +36,7 @@ type Stage struct {
 	When           []config.Matcher            `yaml:"when,omitempty" json:"when,omitempty"`
 	Inputs         []string                    `yaml:"inputs,omitempty" json:"inputs,omitempty"`
 	TimeoutMinutes int                         `yaml:"timeout_minutes,omitempty" json:"timeout_minutes,omitempty"`
+	Env            map[string]config.FlexStr   `yaml:"env,omitempty" json:"env,omitempty"`
 	Setup          map[string]config.SetupTool `yaml:"setup,omitempty" json:"setup,omitempty"`
 	Cache          *config.StageCache          `yaml:"cache,omitempty" json:"cache,omitempty"`
 	Steps          []config.StageStep          `yaml:"steps,omitempty" json:"steps,omitempty"`
@@ -51,6 +52,7 @@ type EffectiveStage struct {
 	When           []config.Matcher
 	Inputs         []string
 	TimeoutMinutes int
+	Env            map[string]config.FlexStr
 	Setup          map[string]config.SetupTool
 	Cache          *config.StageCache
 	Steps          []config.StageStep
@@ -161,6 +163,7 @@ func resolveStage(group, name string, tpl Stage, mod config.ModuleStage, file *d
 		When:           tpl.When,
 		Inputs:         tpl.Inputs,
 		TimeoutMinutes: tpl.TimeoutMinutes,
+		Env:            cloneEnv(tpl.Env),
 		Setup:          tpl.Setup,
 		Cache:          tpl.Cache,
 		Steps:          tpl.Steps,
@@ -195,8 +198,25 @@ func resolveStage(group, name string, tpl Stage, mod config.ModuleStage, file *d
 		if len(sf.Steps) > 0 {
 			es.Steps = sf.Steps
 		}
+		for k, v := range sf.Env { // stage-file env overlays template env
+			if es.Env == nil {
+				es.Env = map[string]config.FlexStr{}
+			}
+			es.Env[k] = v
+		}
 	}
 	return es
+}
+
+func cloneEnv(in map[string]config.FlexStr) map[string]config.FlexStr {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]config.FlexStr, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 func readFile(path string) ([]byte, error) { return os.ReadFile(path) }

@@ -1,39 +1,114 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"context"
+	"fmt"
+	"time"
 
-// newRunCommand executes the full plan (CI and, when applicable, CD).
-func newRunCommand(_ *App) *cobra.Command {
+	"github.com/spf13/cobra"
+
+	"github.com/frodo-ci/frodo-ci/internal/cache"
+	"github.com/frodo-ci/frodo-ci/internal/plan"
+	"github.com/frodo-ci/frodo-ci/internal/runner"
+)
+
+// newRunCommand executes the full plan (the final check).
+func newRunCommand(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "run",
 		Short: "Calculate the plan and execute all required stages (the final check)",
 		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci run")
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return app.runExecute(cmd.Context(), "all")
 		},
 	}
 }
 
 // newCICommand executes only the CI stages.
-func newCICommand(_ *App) *cobra.Command {
+func newCICommand(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "ci",
 		Short: "Execute only the CI stages (validate, test, build, package, scan)",
 		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci ci")
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return app.runExecute(cmd.Context(), "ci")
 		},
 	}
 }
 
 // newCDCommand executes only the CD stages for the selected environment.
-func newCDCommand(_ *App) *cobra.Command {
+func newCDCommand(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "cd",
 		Short: "Execute only the CD stages (publish, deploy, verify)",
 		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci cd")
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return app.runExecute(cmd.Context(), "cd")
 		},
 	}
+}
+
+func (a *App) runExecute(ctx context.Context, group string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	loaded, err := plan.Load(a.RepoRoot, time.Now())
+	if err != nil {
+		return err
+	}
+	// Invalid configuration must fail before any expensive setup.
+	if loaded.HasErrors() {
+		fmt.Fprintln(a.Err, "Configuration is invalid; refusing to run:")
+		printProblems(a.Err, loaded.Problems)
+		return ErrExitQuiet
+	}
+
+	c, err := openCache(loaded.Root)
+	if err != nil {
+		return err
+	}
+	p, err := loaded.Plan(a.planContext(), c)
+	if err != nil {
+		return err
+	}
+
+	result := runner.New(loaded, a.runnerOptions(loaded, c)).Run(ctx, p, group)
+
+	if a.JSON {
+		if err := writeJSON(a.Out, result); err != nil {
+			return err
+		}
+	} else {
+		a.printResult(result)
+	}
+	if !result.Success {
+		return ErrExitQuiet
+	}
+	return nil
+}
+
+func (a *App) runnerOptions(loaded *plan.Loaded, c cache.Cache) runner.Options {
+	ex := loaded.Root.Execution
+	return runner.Options{
+		Env:                  map[string]string{},
+		MaxParallelModules:   ex.MaxParallelModules,
+		MaxParallelExpensive: ex.MaxParallelExpensiveStages,
+		FullRunTimeout:       time.Duration(ex.FullRunTimeoutMinutes) * time.Minute,
+		NoProgressTimeout:    time.Duration(ex.NoProgressTimeoutMinutes) * time.Minute,
+		StageDefaultTimeout:  30 * time.Minute,
+		StopModuleOnFailure:  ex.StopModuleOnStageFailure,
+		StopDependents:       ex.StopDependentsOnDependencyFailure,
+		Cache:                c,
+		Log:                  a.Log,
+	}
+}
+
+func (a *App) printResult(result *runner.Result) {
+	for _, s := range result.Stages {
+		fmt.Fprintf(a.Out, "%-8s %s/%s/%s  (%s)\n", s.Status, s.Module, s.Group, s.Stage, s.Duration.Round(time.Millisecond))
+		if s.Note != "" {
+			fmt.Fprintf(a.Out, "         %s\n", s.Note)
+		}
+	}
+	fmt.Fprintf(a.Out, "\n%s\n", result.Summary())
 }

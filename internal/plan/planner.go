@@ -381,6 +381,9 @@ func (l *Loaded) moduleChanged(name string, changes []string) bool {
 // FindModule returns a discovered module by name.
 func (l *Loaded) FindModule(name string) *discover.Module { return l.ByName[name] }
 
+// HasErrors reports whether configuration has any blocking error.
+func (l *Loaded) HasErrors() bool { return configlint.HasErrors(l.Problems) }
+
 // Explanation is one module/stage that a file affects, and why.
 type Explanation struct {
 	Module string `json:"module"`
