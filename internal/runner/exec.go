@@ -49,7 +49,9 @@ func runStep(ctx context.Context, repoRoot, workdir, run string, env []string, l
 		return res
 	}
 	res.Err = err.Error()
-	res.Output = tailString(string(out), 30, 3000)
+	// Keep a generous tail so stack-aware diagnosis has enough to extract from;
+	// the report distills this to a concise snippet for display.
+	res.Output = tailString(string(out), 200, 16000)
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {
 		res.ExitCode = ee.ExitCode()

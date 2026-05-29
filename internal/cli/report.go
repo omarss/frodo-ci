@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/diag"
 	"github.com/omarss/frodo-ci/internal/github"
 	"github.com/omarss/frodo-ci/internal/perf"
 	"github.com/omarss/frodo-ci/internal/plan"
@@ -58,8 +59,16 @@ func (a *App) buildReportInput(loaded *plan.Loaded, p *plan.Plan, res *runner.Re
 			if step.TimedOut {
 				sr.FailReason = "timed out"
 			}
-			sr.Output = step.Output
 			sr.ReproduceCmd, sr.ReproduceDir = reproduce(loaded, s.Module, s.Stage, len(s.Steps)-1)
+			// Stack-aware diagnosis: detect the tech stack and extract the
+			// salient error, summary, and fix hint from the raw output.
+			d := diag.Analyze(diag.Input{
+				Command:    sr.ReproduceCmd,
+				Output:     step.Output,
+				Stage:      s.Stage,
+				ModuleType: moduleType(loaded, s.Module),
+			})
+			sr.Summary, sr.Hint, sr.Stack, sr.Output = d.Summary, d.Hint, d.Stack, d.Snippet
 		}
 		stages = append(stages, sr)
 	}
@@ -79,6 +88,17 @@ func ownerMentions(loaded *plan.Loaded, module string) []string {
 		out = append(out, "@"+u)
 	}
 	return out
+}
+
+func moduleType(loaded *plan.Loaded, module string) string {
+	m := loaded.FindModule(module)
+	if m == nil {
+		return ""
+	}
+	if m.Config.Use.Profile != "" {
+		return m.Config.Use.Profile
+	}
+	return m.Config.Type
 }
 
 func lastFailedStep(steps []runner.StepResult) *runner.StepResult {
