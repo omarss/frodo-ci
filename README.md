@@ -9,14 +9,15 @@ through **one** standard workflow and **one** required merge check.
 > Core principle: **run the minimum necessary work, but never skip risk.**
 
 > [!WARNING]
-> **Status: experimental (v0.1).** The deterministic core — planning,
-> config validation, semantic linting, fingerprinting, and the execution engine
-> — is implemented and unit-tested (19 packages, `make test` green). The GitHub
-> check-run, review/expert, security-tool, and Slack integrations are
-> implemented against their real clients but have **not yet been exercised in a
-> live GitHub Actions run**, and security scanning currently *decides which
-> scans to run* without fully parsing/enforcing each tool's findings. **Do not
-> rely on it as your only merge gate yet.** See [Known limitations](#known-limitations).
+> **Status: v1.0.0.** The deterministic core — planning, config validation,
+> semantic linting, fingerprinting, and the execution engine — is implemented
+> and unit-tested (19 packages, `make test` green). The GitHub check-run,
+> review/expert, security-tool, and Slack integrations are implemented against
+> their real clients but have **not yet been exercised in a live GitHub Actions
+> run**, and security scanning currently *selects* the scans to run without
+> fully parsing/enforcing each tool's findings. **Treat the integration layers
+> as beta — don't rely on it as your only merge gate yet.** See
+> [Known limitations](#known-limitations).
 
 ## Contents
 
@@ -57,7 +58,7 @@ through **one** standard workflow and **one** required merge check.
 
 ## Install
 
-### From source (works today)
+### From source
 
 ```bash
 git clone https://github.com/omarss/frodo-ci.git
@@ -73,9 +74,10 @@ frodo-ci doctor
 curl -fsSL https://raw.githubusercontent.com/omarss/frodo-ci/main/install.sh | bash
 ```
 
-> This one-liner and the `omarss/frodo-ci@v1` GitHub Action become usable once
-> the repository is **public** and a **tagged release** exists. While the repo is
-> private with no releases, use the from-source path above.
+> Installs the latest released binary (linux/macOS, amd64/arm64), falling back
+> to `go install` when no prebuilt binary matches. You can also
+> `go install github.com/omarss/frodo-ci/cmd/frodo-ci@v1.0.0`. In a workflow,
+> reference the Action as `omarss/frodo-ci@v1`.
 
 ## Quickstart: the example monorepo
 
@@ -220,8 +222,6 @@ Be aware of these before adopting it to gate merges:
   not yet parse each tool's findings (SARIF) and block on them.
 - **No toolchain provisioning.** `run` executes your steps assuming the tools
   exist; installing JDK/Node/etc. is the workflow's or host's job.
-- **Distribution.** The curl installer and `@v1` Action need the repo to be
-  public with a tagged release; until then, build from source.
 - **GitHub/Slack features need credentials** (`GITHUB_TOKEN`, `SLACK_WEBHOOK_URL`)
   and a PR context to do anything; locally they degrade gracefully.
 
