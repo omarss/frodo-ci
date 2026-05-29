@@ -8,39 +8,105 @@ through **one** standard workflow and **one** required merge check.
 
 > Core principle: **run the minimum necessary work, but never skip risk.**
 
-## What Frodo CI gives you
+> [!WARNING]
+> **Status: experimental (v0.1).** The deterministic core — planning,
+> config validation, semantic linting, fingerprinting, and the execution engine
+> — is implemented and unit-tested (19 packages, `make test` green). The GitHub
+> check-run, review/expert, security-tool, and Slack integrations are
+> implemented against their real clients but have **not yet been exercised in a
+> live GitHub Actions run**, and security scanning currently *decides which
+> scans to run* without fully parsing/enforcing each tool's findings. **Do not
+> rely on it as your only merge gate yet.** See [Known limitations](#known-limitations).
+
+## Contents
+
+- [What you get](#what-you-get)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Quickstart: the example monorepo](#quickstart-the-example-monorepo)
+- [Use it in your repo](#use-it-in-your-repo)
+- [Commands](#commands)
+- [How planning works](#how-planning-works)
+- [The final check](#the-final-check)
+- [Branch protection](#branch-protection)
+- [Known limitations](#known-limitations)
+- [Contributing](#contributing)
+- [License](#license)
+
+## What you get
 
 - One GitHub workflow: `.github/workflows/frodo-ci.yml`
 - One required PR check: `Frodo CI / final`
-- Dynamic module/stage planning at startup (deterministic)
+- Deterministic module/stage planning at startup
 - Decentralized module automation under `.ci`, with central quality profiles
 - Exact fingerprint-based stage skipping (cache never skips review/security/policy)
-- Built-in templates, smart security scanning, performance budgets
+- Built-in templates, smart security-scan selection, performance budgets
 - Owner and expert reviewer enforcement, anti-weakening checks
-- Slack notifications for actionable failures
+- Deduplicated Slack notifications for actionable failures
 - JSON Schema autocomplete and human-friendly config linting
+
+## Requirements
+
+- **Go 1.25+** to build from source (`GOTOOLCHAIN=auto` will fetch it if your
+  local Go is older).
+- **git** — used for change detection.
+- To actually *execute* stages with `frodo-ci run`, the target repo's build
+  tools must be present (e.g. `mvnw`, `pnpm`, `docker`). Frodo CI runs your
+  steps; it does not install language toolchains itself (the GitHub workflow's
+  `setup-*` steps, or your machine, provide those).
 
 ## Install
 
+### From source (works today)
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/omarss/frodo-ci/main/install.sh | bash
+git clone https://github.com/omarss/frodo-ci.git
+cd frodo-ci
+make build           # -> ./bin/frodo-ci
+make install         # -> $(go env GOBIN)/frodo-ci  (add it to your PATH)
 frodo-ci doctor
 ```
 
-Or build from source (Go 1.25+):
+### Script / GitHub Action install
 
 ```bash
-make build      # -> ./bin/frodo-ci
-make install    # -> $GOBIN/frodo-ci
+curl -fsSL https://raw.githubusercontent.com/omarss/frodo-ci/main/install.sh | bash
 ```
 
-## Bootstrap a repository
+> This one-liner and the `omarss/frodo-ci@v1` GitHub Action become usable once
+> the repository is **public** and a **tagged release** exists. While the repo is
+> private with no releases, use the from-source path above.
+
+## Quickstart: the example monorepo
+
+The repo ships a small, multi-language example you can drive immediately. No
+tokens or external tools are needed for these commands.
 
 ```bash
-frodo-ci init
+# A Spring service (cards) depends on a Java library (vrtx-common);
+# a Node app (portal) depends on a Node library (shared-ui); plus k8s infra.
+frodo-ci -C examples/monorepo validate-config
+frodo-ci -C examples/monorepo lint-config
+frodo-ci -C examples/monorepo explain packages/vrtx-common/src/main/java/Common.java
+frodo-ci -C examples/monorepo fingerprint cards.test
 ```
 
-Creates (idempotently; `--force` to overwrite):
+`explain` shows the key behavior: a change to `vrtx-common` re-runs `cards`'
+`test`, `build`, `package`, and `scan` (its declared `affects`) — but **not**
+`cards.validate`. See [`examples/monorepo/README.md`](examples/monorepo/README.md).
+
+## Use it in your repo
+
+```bash
+cd /path/to/your/monorepo
+frodo-ci init                                   # scaffold config, schemas, templates, workflow
+frodo-ci init-module --name cards --type spring-service \
+  --path services/cards --owner cards-team
+frodo-ci validate-config && frodo-ci lint-config
+frodo-ci plan                                   # preview what would run, and why
+```
+
+`init` writes (idempotently; `--force` to overwrite):
 
 ```text
 .github/workflows/frodo-ci.yml      # the only workflow you need
@@ -52,12 +118,6 @@ Creates (idempotently; `--force` to overwrite):
 .github/frodo-ci/lint/rules.yml
 .github/frodo-ci/performance/budgets.yml
 .vscode/settings.json
-```
-
-## Add a module
-
-```bash
-frodo-ci init-module --name cards --type spring-service --path services/cards --owner cards-team
 ```
 
 A module only declares what differs from its template:
@@ -80,19 +140,32 @@ not enough.
 
 ## Commands
 
-```bash
-frodo-ci validate-config      # structural validation against the JSON Schemas
-frodo-ci lint-config          # semantic linting (cycles, broad inputs, weakening, ...)
-frodo-ci plan                 # what will run, and why (add --json)
-frodo-ci explain <file>       # which modules/stages a file affects, and why
-frodo-ci fingerprint cards.test   # the deterministic fingerprint for a stage
-frodo-ci run                  # calculate the plan and execute it (the final check)
-frodo-ci ci | cd              # run only CI or only CD stages
-frodo-ci review               # evaluate review/owner/expert requirements
-frodo-ci doctor               # environment + config health
-frodo-ci schemas export       # (re)write the JSON Schemas
-frodo-ci templates list|explain <name>
-```
+Run any command with `--help` for details. Global flags apply to all of them.
+
+| Command | What it does |
+|---|---|
+| `init` | Scaffold Frodo CI into the repository |
+| `init-module --name --type --path --owner` | Scaffold a module's `.ci/module.yml` |
+| `validate-config` | Validate config against the JSON Schemas |
+| `lint-config` | Semantic linting (cycles, broad inputs, weakening, ...) |
+| `plan` | Calculate and print the execution plan |
+| `explain <file>` | Which modules/stages a file affects, and why |
+| `fingerprint <module.stage>` | Deterministic fingerprint for a stage (`--inputs` to list inputs) |
+| `run` / `ci` / `cd` | Execute the plan (all / CI-only / CD-only) — the final check |
+| `review` | Evaluate review/owner/expert requirements for the PR |
+| `doctor` | Environment + configuration health |
+| `schemas export` | (Re)write the JSON Schemas |
+| `templates list` / `templates explain <name>` | Inspect module templates |
+
+**Global flags:**
+
+| Flag | Meaning |
+|---|---|
+| `-C, --repo <path>` | Repository root (default: current directory) |
+| `--base <ref>` / `--head <ref>` | Change-detection range (default: auto / working tree) |
+| `--environment <env>` | Target environment for CD stages (default: `staging`) |
+| `--json` | Machine-readable JSON output where supported |
+| `--log-level <level>` | `trace`\|`debug`\|`info`\|`warn`\|`error` |
 
 ## How planning works
 
@@ -135,41 +208,54 @@ Frodo CI / final
 Do not require the dynamic module/stage checks individually; Frodo CI tracks them
 internally and makes the final check pass or fail.
 
-## Development
+## Known limitations
+
+Be aware of these before adopting it to gate merges:
+
+- **Not yet run end-to-end in GitHub Actions.** Dynamic check-run creation, the
+  `Frodo CI / final` gating, review/expert enforcement, and Slack delivery are
+  implemented (`go-github`, `slack-go`) but unproven against a live run.
+- **Security scanning decides, it does not fully enforce.** It correctly selects
+  which scans to run per change type and invokes a tool if installed, but does
+  not yet parse each tool's findings (SARIF) and block on them.
+- **No toolchain provisioning.** `run` executes your steps assuming the tools
+  exist; installing JDK/Node/etc. is the workflow's or host's job.
+- **Distribution.** The curl installer and `@v1` Action need the repo to be
+  public with a tagged release; until then, build from source.
+- **GitHub/Slack features need credentials** (`GITHUB_TOKEN`, `SLACK_WEBHOOK_URL`)
+  and a PR context to do anything; locally they degrade gracefully.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). In short:
 
 ```bash
-make build      # compile
-make test       # race tests
-make lint       # golangci-lint (or go vet)
+make build      # compile to ./bin
+make test       # race tests (19 packages)
+make lint       # golangci-lint (falls back to go vet)
 make fmt        # gofmt
 make schemas    # regenerate JSON Schemas
 ```
 
-## Implementation status
+Repository layout:
 
-This repository implements the deterministic core end to end:
-
-- ✅ Config domain + position-aware YAML loading
-- ✅ JSON Schema generation + validation with did-you-mean diagnostics
-- ✅ Module discovery, git change detection, glob/regex matching
-- ✅ Dependency graph + integrity checks (cycles, fan-out, broad/escaping paths)
-- ✅ Deterministic fingerprinting + cache (local; CI-persisted via actions/cache)
-- ✅ Startup planner; `plan`/`explain`/`fingerprint`/`validate-config`/`lint-config`
-- ✅ Templates, quality profiles, ad-hoc command detection
-- ✅ Stage execution engine (bounded parallelism, timeouts, fail-fast)
-- ✅ `init`/`init-module`/`doctor` and the embedded scaffolding
-- ✅ GitHub dynamic check-runs + review/expert enforcement (`go-github`)
-- ✅ Smart security scanning + anti-weakening + protected-file governance
-- ✅ Performance budgets/regression + deduplicated Slack notifications
-
-The deterministic decision logic for every layer is implemented and unit-tested.
-The thin I/O edges that require external systems are wired against their real
-clients but can only be exercised with live credentials/tooling:
-
-- GitHub API calls (check-runs, reviews, permissions) need `GITHUB_TOKEN`
-- Slack delivery needs `SLACK_WEBHOOK_URL`
-- security scanners (trivy, semgrep, gitleaks, hadolint, ...) run when installed
-- the cache directory is persisted across CI runs via `actions/cache`
+```text
+cmd/frodo-ci/            # CLI entrypoint
+internal/
+  config/                # typed config model + YAML loaders
+  schema/                # JSON Schema generation + validation
+  discover/ match/ vcs/  # module discovery, glob matching, git
+  graph/                 # dependency graph + integrity checks
+  fingerprint/ cache/    # deterministic fingerprints + cache backends
+  configlint/ plan/      # semantic linting + the startup planner
+  templates/             # module templates + effective-stage merge
+  runner/                # stage execution engine
+  github/ reviews/       # GitHub API + review/expert governance
+  security/ antiweaken/ protected/   # smart scanning + governance
+  perf/ slack/           # performance budgets + notifications
+  cli/                   # cobra commands
+examples/monorepo/       # a runnable, vrtx-style example
+```
 
 ## License
 
