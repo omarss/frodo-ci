@@ -164,6 +164,7 @@ Run any command with `--help` for details. Global flags apply to all of them.
 |---|---|
 | `init` | Scaffold Frodo CI into the repository (`--action-ref` for forks; `--force`) |
 | `init-module --name --type --path --owner` | Scaffold a module's `.ci/module.yml` (`--depends-on m[:affects=a,b]` repeatable; `--force`) |
+| `scaffold` | Detect modules from build metadata (Maven/pnpm/go/Docker/IaC) and propose `.ci/module.yml` files (`--write` to apply, `--owner` fallback) |
 | `validate-config` | Validate config against the JSON Schemas |
 | `lint-config` | Semantic linting (cycles, broad inputs, weakening, ...) |
 | `plan` | Calculate and print the execution plan |
