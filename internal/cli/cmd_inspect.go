@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/frodo-ci/frodo-ci/internal/config"
 	"github.com/frodo-ci/frodo-ci/internal/schema"
+	"github.com/frodo-ci/frodo-ci/internal/templates"
 )
 
 // newReviewCommand evaluates review and approval requirements for the PR.
@@ -92,25 +96,128 @@ func newTemplatesCommand(app *App) *cobra.Command {
 }
 
 // newTemplatesListCommand lists available templates.
-func newTemplatesListCommand(_ *App) *cobra.Command {
+func newTemplatesListCommand(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List available module templates",
 		Args:  cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci templates list")
+			return app.runTemplatesList()
 		},
 	}
 }
 
 // newTemplatesExplainCommand explains one template's stages and defaults.
-func newTemplatesExplainCommand(_ *App) *cobra.Command {
+func newTemplatesExplainCommand(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "explain <template>",
 		Short: "Explain a template's stages and defaults",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci templates explain")
+		RunE: func(_ *cobra.Command, args []string) error {
+			return app.runTemplatesExplain(args[0])
 		},
 	}
+}
+
+func (a *App) templatesDir() string {
+	dir := ".github/frodo-ci/templates"
+	if root, _, err := config.LoadRoot(filepath.Join(a.RepoRoot, ".github", "frodo-ci.yml")); err == nil && root.Templates.Path != "" {
+		dir = root.Templates.Path
+	}
+	return filepath.Join(a.RepoRoot, filepath.FromSlash(dir))
+}
+
+func availableTemplates(dir string) []string {
+	set := map[string]bool{}
+	for _, n := range templates.DefaultNames() {
+		set[n] = true
+	}
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".yml") {
+				set[strings.TrimSuffix(e.Name(), ".yml")] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(set))
+	for n := range set {
+		out = append(out, n)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (a *App) runTemplatesList() error {
+	dir := a.templatesDir()
+	loader := templates.NewLoader(dir)
+	names := availableTemplates(dir)
+	if a.JSON {
+		return writeJSON(a.Out, names)
+	}
+	fmt.Fprintln(a.Out, "Available templates:")
+	for _, name := range names {
+		t, _ := loader.Get(name)
+		stages := 0
+		if t != nil {
+			stages = len(t.CI) + len(t.CD)
+		}
+		fmt.Fprintf(a.Out, "  %-16s %d stage(s)\n", name, stages)
+	}
+	return nil
+}
+
+func (a *App) runTemplatesExplain(name string) error {
+	dir := a.templatesDir()
+	loader := templates.NewLoader(dir)
+	t, err := loader.Get(name)
+	if err != nil {
+		return err
+	}
+	if t == nil {
+		return fmt.Errorf("unknown template %q (available: %s)", name, strings.Join(availableTemplates(dir), ", "))
+	}
+	if a.JSON {
+		return writeJSON(a.Out, t)
+	}
+	fmt.Fprintf(a.Out, "Template: %s\n", name)
+	if t.Type != "" {
+		fmt.Fprintf(a.Out, "Type:     %s\n", t.Type)
+	}
+	q := t.Quality
+	fmt.Fprintf(a.Out, "Quality:  format=%s lint=%s security=%s performance=%s\n",
+		orDash(q.Format), orDash(q.Lint), orDash(q.Security), orDash(q.Performance))
+	printTemplateStages(a.Out, "CI", t.CI)
+	printTemplateStages(a.Out, "CD", t.CD)
+	return nil
+}
+
+func printTemplateStages(w interface{ Write([]byte) (int, error) }, group string, stages map[string]templates.Stage) {
+	if len(stages) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "%s stages:\n", group)
+	names := make([]string, 0, len(stages))
+	for n := range stages {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		s := stages[n]
+		var when []string
+		for _, m := range s.When {
+			when = append(when, m.String())
+		}
+		fmt.Fprintf(w, "  %-9s %d step(s)", n, len(s.Steps))
+		if len(when) > 0 {
+			fmt.Fprintf(w, "  when: %s", strings.Join(when, ", "))
+		}
+		fmt.Fprintln(w)
+	}
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
 }

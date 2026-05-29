@@ -19,6 +19,7 @@ import (
 	"github.com/frodo-ci/frodo-ci/internal/graph"
 	"github.com/frodo-ci/frodo-ci/internal/match"
 	"github.com/frodo-ci/frodo-ci/internal/schema"
+	"github.com/frodo-ci/frodo-ci/internal/templates"
 	"github.com/frodo-ci/frodo-ci/internal/vcs"
 )
 
@@ -56,21 +57,54 @@ func (c *Catalog) TemplateBytes(profile string) []byte {
 
 // Loaded is the validated, linted repository state from which plans are derived.
 type Loaded struct {
-	RepoRoot   string
-	Root       *config.RootConfig
-	RootSource *config.Source
-	Modules    []*discover.Module
-	ByName     map[string]*discover.Module
-	Graph      *graph.Graph
-	Catalog    *Catalog
-	Problems   []configlint.Problem // schema + semantic, combined
+	RepoRoot         string
+	Root             *config.RootConfig
+	RootSource       *config.Source
+	Modules          []*discover.Module
+	ByName           map[string]*discover.Module
+	Graph            *graph.Graph
+	Catalog          *Catalog
+	Problems         []configlint.Problem // schema + semantic, combined
 	SchemaProblems   []configlint.Problem
 	SemanticProblems []configlint.Problem
+
+	tmpl *templates.Loader
+	eff  map[string]map[string]templates.EffectiveStage
 
 	files    []string
 	filesSet bool
 	modFiles map[string][]string
 	modFP    map[string]string
+}
+
+// EffectiveStages returns the module's stages with template defaults merged in,
+// keyed by stage name. The result is cached per module.
+func (l *Loaded) EffectiveStages(m *discover.Module) map[string]templates.EffectiveStage {
+	if es, ok := l.eff[m.Name]; ok {
+		return es
+	}
+	t, _ := l.tmpl.Get(profileOf(m))
+	es := templates.Resolve(t, m)
+	l.eff[m.Name] = es
+	return es
+}
+
+// effStage returns the merged effective stage for a module, if it has one.
+func (l *Loaded) effStage(m *discover.Module, stage string) (templates.EffectiveStage, bool) {
+	es, ok := l.EffectiveStages(m)[stage]
+	return es, ok
+}
+
+// stagePatterns resolves a stage's effective when/inputs to repo-relative
+// globs/regexes. ok is false when the module has no such stage.
+func (l *Loaded) stagePatterns(m *discover.Module, stage string) (globs []string, regexes []*regexp.Regexp, inputGlobs []string, ok bool) {
+	es, ok := l.effStage(m, stage)
+	if !ok {
+		return nil, nil, nil, false
+	}
+	globs, regexes = resolveMatchers(m.Dir, es.When)
+	inputGlobs, _ = match.ResolveAll(m.Dir, es.Inputs)
+	return globs, regexes, inputGlobs, true
 }
 
 // Load performs the deterministic startup pipeline up to and including config
@@ -100,6 +134,8 @@ func Load(repoRoot string, now time.Time) (*Loaded, error) {
 		ByName:     discover.ByName(modules),
 		Graph:      g,
 		Catalog:    cat,
+		tmpl:       templates.NewLoader(cat.TemplatesDir),
+		eff:        map[string]map[string]templates.EffectiveStage{},
 		modFiles:   map[string][]string{},
 		modFP:      map[string]string{},
 	}
@@ -237,9 +273,7 @@ func (l *Loaded) Plan(ctx Context, c cache.Cache) (*Plan, error) {
 // StageFingerprint computes a stage's deterministic fingerprint and the file
 // surface that fed it.
 func (l *Loaded) StageFingerprint(m *discover.Module, stage string) (string, []string, error) {
-	st, _ := m.Config.Stage(stage)
-	globs, regexes := resolveMatchers(m.Dir, st.When)
-	inputGlobs, _ := match.ResolveAll(m.Dir, st.Inputs)
+	globs, regexes, inputGlobs, _ := l.stagePatterns(m, stage)
 	if len(globs) == 0 && len(regexes) == 0 && len(inputGlobs) == 0 {
 		globs = []string{m.Dir + "/**"} // default surface: the whole module
 	}
@@ -283,17 +317,15 @@ func (l *Loaded) StageFingerprint(m *discover.Module, stage string) (string, []s
 
 // stageApplicable reports whether a stage could run for a module in this context.
 func (l *Loaded) stageApplicable(m *discover.Module, stage string, ctx Context) bool {
-	_, declared := m.Config.Stage(stage)
-	_, hasFile := m.Stages[stage]
-	hasProfile := profileOf(m) != ""
-	if !(declared || hasFile || hasProfile) {
-		return false
+	es, ok := l.effStage(m, stage)
+	if !ok {
+		return false // the module's template/config does not define this stage
 	}
 	if l.group(stage) == "cd" {
 		if !(ctx.OnDefaultBranch || ctx.Event == "workflow_dispatch") {
 			return false
 		}
-		if st, ok := m.Config.Stage(stage); ok && len(st.Environments) > 0 && !containsStr(st.Environments, ctx.Environment) {
+		if len(es.Environments) > 0 && !containsStr(es.Environments, ctx.Environment) {
 			return false
 		}
 	}
@@ -303,9 +335,7 @@ func (l *Loaded) stageApplicable(m *discover.Module, stage string, ctx Context) 
 // stageTriggers returns the reasons a stage must run and the changed files that
 // matched it. An empty reasons slice means the stage is not triggered.
 func (l *Loaded) stageTriggers(m *discover.Module, stage string, ctx Context, changes []string) (reasons, matched []string) {
-	st, _ := m.Config.Stage(stage)
-	globs, regexes := resolveMatchers(m.Dir, st.When)
-	inputGlobs, _ := match.ResolveAll(m.Dir, st.Inputs)
+	globs, regexes, inputGlobs, _ := l.stagePatterns(m, stage)
 	usingDefault := len(globs) == 0 && len(regexes) == 0 && len(inputGlobs) == 0
 	if usingDefault {
 		globs = []string{m.Dir + "/**"}
@@ -366,13 +396,10 @@ func (l *Loaded) Explain(file string) []Explanation {
 	var out []Explanation
 	for _, m := range l.Modules {
 		for _, stage := range l.Root.AllStages() {
-			st, declared := m.Config.Stage(stage)
-			_, hasFile := m.Stages[stage]
-			if !declared && !hasFile {
-				continue // only explain stages the module actually configures
+			globs, regexes, inputGlobs, ok := l.stagePatterns(m, stage)
+			if !ok {
+				continue // module's template/config does not define this stage
 			}
-			globs, regexes := resolveMatchers(m.Dir, st.When)
-			inputGlobs, _ := match.ResolveAll(m.Dir, st.Inputs)
 			noPatterns := len(globs) == 0 && len(regexes) == 0 && len(inputGlobs) == 0
 			under := file == m.Dir || strings.HasPrefix(file, m.Dir+"/")
 			switch {

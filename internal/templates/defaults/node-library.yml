@@ -1,0 +1,53 @@
+name: node-library
+type: node-library
+
+quality:
+  format: strict
+  lint: strict
+  security: standard
+  performance: standard
+
+ci:
+  validate:
+    when: [package.json, src/**, .ci/**]
+    setup:
+      node: {version: 22}
+    cache:
+      paths: [~/.local/share/pnpm/store]
+    steps:
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -s typecheck
+
+  test:
+    when: [package.json, src/**, test/**, tests/**]
+    setup:
+      node: {version: 22}
+    cache:
+      paths: [~/.local/share/pnpm/store]
+    steps:
+      - name: Test
+        run: pnpm -s test
+
+  build:
+    when: [package.json, src/**]
+    setup:
+      node: {version: 22}
+    cache:
+      paths: [~/.local/share/pnpm/store]
+    steps:
+      - name: Build
+        run: pnpm -s build
+
+  scan:
+    when: [package.json, pnpm-lock.yaml, src/**]
+    security:
+      profile: standard
+
+cd:
+  publish:
+    when: [package.json, src/**]
+    steps:
+      - name: Publish package
+        run: pnpm publish --no-git-checks

@@ -1,0 +1,67 @@
+name: spring-service
+type: spring-service
+
+quality:
+  format: strict
+  lint: strict
+  security: standard
+  performance: standard
+
+ci:
+  validate:
+    when: [pom.xml, src/**, .ci/**]
+    setup:
+      java: {distribution: liberica, version: 25}
+    steps:
+      - name: Validate
+        run: ./mvnw -q -pl . -am validate
+
+  test:
+    when: [pom.xml, src/main/**, src/test/**]
+    setup:
+      java: {distribution: liberica, version: 25}
+    cache:
+      paths: [~/.m2/repository]
+    steps:
+      - name: Unit and integration tests
+        run: ./mvnw -q -pl . -am verify
+
+  build:
+    when: [pom.xml, src/main/**]
+    setup:
+      java: {distribution: liberica, version: 25}
+    cache:
+      paths: [~/.m2/repository]
+    steps:
+      - name: Build
+        run: ./mvnw -q -pl . -am -DskipTests package
+
+  package:
+    when: [pom.xml, src/main/**, src/main/docker/**, Dockerfile]
+    steps:
+      - name: Build image
+        run: docker build -t "$FRODO_IMAGE" .
+
+  scan:
+    when: [pom.xml, src/**, Dockerfile]
+    security:
+      profile: standard
+
+cd:
+  publish:
+    when: [pom.xml, src/main/**, Dockerfile]
+    steps:
+      - name: Push image
+        run: docker push "$FRODO_IMAGE"
+
+  deploy:
+    environments: [staging, production]
+    steps:
+      - name: Deploy
+        run: echo "deploy $FRODO_ENVIRONMENT"
+
+  verify:
+    environments: [staging, production]
+    steps:
+      - name: Smoke test
+        run: echo "verify $FRODO_ENVIRONMENT"

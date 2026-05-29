@@ -1,0 +1,33 @@
+name: docker-image
+type: docker-image
+
+quality:
+  format: standard
+  lint: standard
+  security: standard
+  performance: standard
+
+ci:
+  validate:
+    when: [Dockerfile, .ci/**]
+    steps:
+      - name: Lint Dockerfile
+        run: hadolint Dockerfile
+
+  build:
+    when: [Dockerfile, "**"]
+    steps:
+      - name: Build image
+        run: docker build -t "$FRODO_IMAGE" .
+
+  scan:
+    when: [Dockerfile]
+    security:
+      profile: standard
+
+cd:
+  publish:
+    when: [Dockerfile]
+    steps:
+      - name: Push image
+        run: docker push "$FRODO_IMAGE"

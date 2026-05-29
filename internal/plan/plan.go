@@ -93,9 +93,9 @@ func (p *Plan) PlannedStages() []*StagePlan {
 
 // Counts summarizes the plan.
 type Counts struct {
-	Modules       int
+	Modules        int
 	RequiredStages int
-	SkippedStages int
+	SkippedStages  int
 }
 
 // Summary returns aggregate counts for the plan.

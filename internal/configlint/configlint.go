@@ -104,6 +104,7 @@ func checkModule(in Input, m *discover.Module) []Problem {
 	ps = append(ps, checkStageNames(in.Root, m, "cd", cfg.CD)...)
 	ps = append(ps, checkStageFiles(m)...)
 	ps = append(ps, checkProfiles(in, m)...)
+	ps = append(ps, checkAdHocCommands(in, m)...)
 
 	maxTimeout := in.Root.Execution.FullRunTimeoutMinutes
 	for _, sr := range m.Stages {
@@ -184,6 +185,77 @@ func checkProfiles(in Input, m *discover.Module) []Problem {
 		}
 	}
 	return ps
+}
+
+// adHocTools are formatter/linter/security tools that must run through central
+// quality profiles, never as ad hoc commands in a stage file.
+var adHocTools = map[string]bool{
+	"eslint": true, "prettier": true, "biome": true, "tslint": true,
+	"spotless": true, "checkstyle": true, "spotbugs": true, "pmd": true,
+	"ruff": true, "black": true, "flake8": true, "pylint": true, "bandit": true,
+	"golangci-lint": true, "staticcheck": true,
+	"shellcheck": true, "shfmt": true, "hadolint": true, "actionlint": true,
+	"kubeconform": true, "kubeval": true, "conftest": true,
+	"semgrep": true, "trivy": true, "grype": true, "snyk": true, "gitleaks": true,
+	"checkov": true, "tflint": true, "tfsec": true,
+}
+
+// checkAdHocCommands flags stage-file steps that invoke a formatter, linter, or
+// security tool directly instead of going through central quality profiles.
+// Only module-authored stage files are checked; framework templates are trusted.
+func checkAdHocCommands(in Input, m *discover.Module) []Problem {
+	banned := map[string]bool{}
+	for t := range adHocTools {
+		banned[t] = true
+	}
+	if in.Toolchains != nil {
+		for t := range in.Toolchains.FormatterTools() {
+			banned[t] = true
+		}
+		for t := range in.Toolchains.LinterTools() {
+			banned[t] = true
+		}
+	}
+
+	var ps []Problem
+	for stage, sr := range m.Stages {
+		for _, step := range sr.File.Steps {
+			for _, tok := range tokenizeCommand(step.Run) {
+				base := lastSegment(tok)
+				if banned[base] || isCustomLintScript(base) {
+					ps = append(ps, Problem{Warning, sr.Path,
+						fmt.Sprintf("stage %q runs %q directly; use central quality/security profiles instead of ad hoc commands", stage, base)})
+					break
+				}
+			}
+		}
+	}
+	return ps
+}
+
+func tokenizeCommand(run string) []string {
+	fields := strings.FieldsFunc(run, func(r rune) bool {
+		switch r {
+		case ' ', '\t', '\n', ';', '|', '&', '(', ')':
+			return true
+		}
+		return false
+	})
+	return fields
+}
+
+func lastSegment(tok string) string {
+	if i := strings.LastIndex(tok, "/"); i >= 0 {
+		return tok[i+1:]
+	}
+	return tok
+}
+
+func isCustomLintScript(base string) bool {
+	if !strings.HasSuffix(base, ".sh") {
+		return false
+	}
+	return strings.Contains(base, "lint") || strings.Contains(base, "format")
 }
 
 func checkSuppressions(in Input) []Problem {

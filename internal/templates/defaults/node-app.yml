@@ -1,0 +1,71 @@
+name: node-app
+type: node-app
+
+quality:
+  format: strict
+  lint: strict
+  security: standard
+  performance: standard
+
+ci:
+  validate:
+    when: [package.json, src/**, .ci/**]
+    setup:
+      node: {version: 22}
+    cache:
+      paths: [~/.local/share/pnpm/store]
+    steps:
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -s typecheck
+
+  test:
+    when: [package.json, src/**, test/**, tests/**]
+    setup:
+      node: {version: 22}
+    cache:
+      paths: [~/.local/share/pnpm/store]
+    steps:
+      - name: Test
+        run: pnpm -s test
+
+  build:
+    when: [package.json, src/**]
+    setup:
+      node: {version: 22}
+    cache:
+      paths: [~/.local/share/pnpm/store]
+    steps:
+      - name: Build
+        run: pnpm -s build
+
+  package:
+    when: [package.json, src/**, Dockerfile]
+    steps:
+      - name: Build image
+        run: docker build -t "$FRODO_IMAGE" .
+
+  scan:
+    when: [package.json, pnpm-lock.yaml, src/**, Dockerfile]
+    security:
+      profile: standard
+
+cd:
+  publish:
+    when: [package.json, src/**, Dockerfile]
+    steps:
+      - name: Push image
+        run: docker push "$FRODO_IMAGE"
+
+  deploy:
+    environments: [staging, production]
+    steps:
+      - name: Deploy
+        run: echo "deploy $FRODO_ENVIRONMENT"
+
+  verify:
+    environments: [staging, production]
+    steps:
+      - name: Smoke test
+        run: echo "verify $FRODO_ENVIRONMENT"

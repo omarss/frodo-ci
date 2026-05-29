@@ -1,0 +1,33 @@
+name: k8s-infra
+type: k8s-infra
+
+quality:
+  format: standard
+  lint: standard
+  security: infra
+  performance: standard
+
+ci:
+  validate:
+    when: ["**/*.yaml", "**/*.yml", .ci/**]
+    steps:
+      - name: Validate manifests
+        run: kubeconform -strict -summary .
+
+  scan:
+    when: ["**/*.yaml", "**/*.yml"]
+    security:
+      profile: infra
+
+cd:
+  deploy:
+    environments: [staging, production]
+    steps:
+      - name: Apply manifests
+        run: echo "kubectl apply for $FRODO_ENVIRONMENT"
+
+  verify:
+    environments: [staging, production]
+    steps:
+      - name: Rollout status
+        run: echo "rollout status for $FRODO_ENVIRONMENT"

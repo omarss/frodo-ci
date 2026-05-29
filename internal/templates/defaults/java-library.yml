@@ -1,0 +1,49 @@
+name: java-library
+type: java-library
+
+quality:
+  format: strict
+  lint: strict
+  security: standard
+  performance: standard
+
+ci:
+  validate:
+    when: [pom.xml, src/**, .ci/**]
+    setup:
+      java: {distribution: liberica, version: 25}
+    steps:
+      - name: Validate
+        run: ./mvnw -q -pl . -am validate
+
+  test:
+    when: [pom.xml, src/main/**, src/test/**]
+    setup:
+      java: {distribution: liberica, version: 25}
+    cache:
+      paths: [~/.m2/repository]
+    steps:
+      - name: Unit tests
+        run: ./mvnw -q -pl . -am test
+
+  build:
+    when: [pom.xml, src/main/**]
+    setup:
+      java: {distribution: liberica, version: 25}
+    cache:
+      paths: [~/.m2/repository]
+    steps:
+      - name: Build
+        run: ./mvnw -q -pl . -am -DskipTests package
+
+  scan:
+    when: [pom.xml, src/**]
+    security:
+      profile: standard
+
+cd:
+  publish:
+    when: [pom.xml, src/main/**]
+    steps:
+      - name: Publish artifact
+        run: ./mvnw -q -pl . -am -DskipTests deploy
