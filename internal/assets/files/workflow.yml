@@ -68,34 +68,41 @@ jobs:
         shell: bash
         run: corepack enable && corepack prepare pnpm@latest --activate
 
-      # Persist the fingerprint cache across runs so unchanged stages stay
-      # skipped. The cache lives outside the workspace (survives checkout) and
-      # accumulates via restore-keys. It never skips scan / CD / reviews.
+      # Restore the fingerprint cache so unchanged stages stay skipped. Split
+      # restore/save (not the combined cache action) so the cache is still saved
+      # when a stage fails -- Frodo writes cache entries for passed stages only,
+      # so a failed run never persists a failure. Keyed per ref (branch) with a
+      # global fallback, so each branch reuses its own lineage first. The cache
+      # lives outside the workspace (survives checkout). It never skips scan/CD/reviews.
       - name: Frodo CI cache directory
         shell: bash
         run: echo "FRODO_CI_CACHE_DIR=$HOME/.cache/frodo-ci" >> "$GITHUB_ENV"
-      - name: Frodo CI cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - name: Restore Frodo CI cache
+        id: frodo-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ~/.cache/frodo-ci
-          key: frodo-ci-cache-${{ github.run_id }}
+          key: frodo-ci-cache-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
+            frodo-ci-cache-${{ github.ref_name }}-
             frodo-ci-cache-
 
-      # Persist language package stores so dependency install and the shared
-      # dependency-graph build start warm instead of cold every run. Keyed by the
-      # lockfiles, with a restore-keys fallback so a partial hit still seeds the
-      # store. Modules build self-only and reuse already-built dependency modules
-      # (Frodo runs dependencies before dependents), so this caches install cost,
-      # not redundant compiles. Add the store path for any other toolchain you use.
-      - name: Toolchain cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      # Restore the language package stores (pnpm, Maven) so dependency install
+      # starts warm instead of cold every run. Keyed per ref + lockfiles, with a
+      # restore-keys fallback so a partial hit still seeds the store. Modules build
+      # self-only and reuse already-built dependency modules (Frodo runs
+      # dependencies before dependents), so this caches install cost, not redundant
+      # compiles. Add the store path for any other toolchain you use.
+      - name: Restore toolchain cache
+        id: toolchain-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             ~/.local/share/pnpm/store
             ~/.m2/repository
-          key: frodo-ci-toolchains-${{ hashFiles('**/pnpm-lock.yaml', '**/pom.xml') }}
+          key: frodo-ci-toolchains-${{ github.ref_name }}-${{ hashFiles('**/pnpm-lock.yaml', '**/pom.xml') }}
           restore-keys: |
+            frodo-ci-toolchains-${{ github.ref_name }}-
             frodo-ci-toolchains-
 
       - name: Run Frodo CI
@@ -106,3 +113,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # Save caches at the end of the job. !cancelled() (not always()) persists a
+      # passing-stage cache even when a later stage failed, but skips saving a
+      # half-written cache from a cancelled run. The fingerprint key embeds run_id
+      # so each run writes a fresh entry the next run restores via restore-keys.
+      - name: Save Frodo CI cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/frodo-ci
+          key: frodo-ci-cache-${{ github.ref_name }}-${{ github.run_id }}
+      - name: Save toolchain cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.local/share/pnpm/store
+            ~/.m2/repository
+          key: frodo-ci-toolchains-${{ github.ref_name }}-${{ hashFiles('**/pnpm-lock.yaml', '**/pom.xml') }}
