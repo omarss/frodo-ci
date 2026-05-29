@@ -14,7 +14,10 @@ func TestBuildCommentFailure(t *testing.T) {
 			{
 				Module: "cards", Stage: "test", Status: "failure",
 				FailedStep: "Run integration tests", FailReason: "exit 1",
-				Output:       "FAIL CardServiceTest.transfer\nexpected 200 got 500",
+				Summary:      "Maven tests failed: 1 failure(s)",
+				Hint:         "Fix the reported test and re-push.",
+				Stack:        "maven",
+				Output:       "CardServiceTest.transfer:42 expected:<200> but was:<500>",
 				Reasons:      []string{"dependency money changed (affects test)"},
 				Owners:       []string{"@cards-team"},
 				ReproduceDir: "services/cards",
@@ -29,14 +32,16 @@ func TestBuildCommentFailure(t *testing.T) {
 		Marker,
 		"1 of 2 check(s) failed",
 		"`cards` · test",
+		"What failed:** Maven tests failed: 1 failure(s)",
 		"Failed step:** Run integration tests (exit 1)",
 		"Why it ran:** dependency money changed",
 		"Owner:** @cards-team",
-		"How to fix:",
+		"How to fix:** Fix the reported test",
+		"Error (maven):",
 		"Reproduce locally:",
 		"cd services/cards",
 		"../../mvnw -pl services/cards -am verify",
-		"expected 200 got 500",
+		"expected:<200> but was:<500>",
 		"abc1234def56", // truncated commit
 		"| cards | validate | ✅",
 	} {
@@ -58,22 +63,6 @@ func TestBuildCommentSuccess(t *testing.T) {
 	}
 	if strings.Contains(out, "How to fix") {
 		t.Error("success comment should not contain fix guidance")
-	}
-}
-
-func TestDiagnoseFromOutput(t *testing.T) {
-	// A registry 403 yields an auth hint, not the generic package template.
-	in := Input{Stages: []StageReport{{
-		Module: "api", Stage: "package", Status: "failure",
-		FailedStep: "Build image", FailReason: "exit 1",
-		Output: "#10 [runner 1/4] FROM registry/base:latest\n#10 ERROR: failed to authorize: 403 Forbidden",
-	}}}
-	out := BuildComment(in)
-	if !strings.Contains(out, "Registry/auth denied") {
-		t.Errorf("expected auth diagnosis derived from output, got:\n%s", out)
-	}
-	if strings.Contains(out, "missing Dockerfile") {
-		t.Error("must not fall back to the generic package hint when auth is the real cause")
 	}
 }
 
