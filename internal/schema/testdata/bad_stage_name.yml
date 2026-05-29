@@ -1,0 +1,7 @@
+name: cards
+type: spring-service
+
+ci:
+  tests:
+    when:
+      - src/**

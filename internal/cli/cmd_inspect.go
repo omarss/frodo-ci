@@ -1,6 +1,14 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+
+	"github.com/frodo-ci/frodo-ci/internal/schema"
+)
 
 // newReviewCommand evaluates review and approval requirements for the PR.
 func newReviewCommand(_ *App) *cobra.Command {
@@ -37,18 +45,40 @@ func newSchemasCommand(app *App) *cobra.Command {
 }
 
 // newSchemasExportCommand writes all JSON Schemas to a directory.
-func newSchemasExportCommand(_ *App) *cobra.Command {
+func newSchemasExportCommand(app *App) *cobra.Command {
 	var out string
 	c := &cobra.Command{
 		Use:   "export",
 		Short: "Write JSON Schemas for all config files to a directory",
 		Args:  cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci schemas export")
+			return app.runSchemasExport(out)
 		},
 	}
 	c.Flags().StringVar(&out, "out", ".github/frodo-ci/schemas", "output directory for schema files")
 	return c
+}
+
+func (a *App) runSchemasExport(out string) error {
+	dir := out
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(a.RepoRoot, dir)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create schema directory %s: %w", dir, err)
+	}
+	for _, k := range schema.ExportedKinds() {
+		data, err := schema.JSON(k)
+		if err != nil {
+			return fmt.Errorf("generate %s schema: %w", k, err)
+		}
+		path := filepath.Join(dir, k.FileName())
+		if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+		fmt.Fprintf(a.Out, "wrote %s\n", filepath.Join(out, k.FileName()))
+	}
+	return nil
 }
 
 // newTemplatesCommand groups template-related subcommands.

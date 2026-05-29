@@ -1,11 +1,16 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/rs/zerolog"
 )
+
+// ErrExitQuiet signals that a command failed after already printing its own
+// diagnostics. main exits non-zero without printing anything further.
+var ErrExitQuiet = errors.New("quiet failure")
 
 // App carries resolved global options and shared dependencies into every
 // subcommand. It is constructed once by NewRootCommand and closed over by each

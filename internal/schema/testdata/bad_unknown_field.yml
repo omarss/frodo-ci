@@ -1,0 +1,6 @@
+name: cards
+type: spring-service
+
+owner:
+  teams:
+    - cards-team
