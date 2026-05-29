@@ -60,3 +60,45 @@ func TestBuildCommentSuccess(t *testing.T) {
 		t.Error("success comment should not contain fix guidance")
 	}
 }
+
+func TestDiagnoseFromOutput(t *testing.T) {
+	// A registry 403 yields an auth hint, not the generic package template.
+	in := Input{Stages: []StageReport{{
+		Module: "api", Stage: "package", Status: "failure",
+		FailedStep: "Build image", FailReason: "exit 1",
+		Output: "#10 [runner 1/4] FROM registry/base:latest\n#10 ERROR: failed to authorize: 403 Forbidden",
+	}}}
+	out := BuildComment(in)
+	if !strings.Contains(out, "Registry/auth denied") {
+		t.Errorf("expected auth diagnosis derived from output, got:\n%s", out)
+	}
+	if strings.Contains(out, "missing Dockerfile") {
+		t.Error("must not fall back to the generic package hint when auth is the real cause")
+	}
+}
+
+func TestReproduceIsRunnable(t *testing.T) {
+	in := Input{Stages: []StageReport{{
+		Module: "api", Stage: "package", Status: "failure",
+		FailedStep: "Build image", FailReason: "exit 1",
+		ReproduceDir: "apps/api", ReproduceCmd: `docker build -t "$FRODO_IMAGE" .`,
+		Env: map[string]string{
+			"FRODO_IMAGE": "api:abc1234", "FRODO_MODULE": "api", "FRODO_MODULE_PATH": "apps/api",
+			"FRODO_STAGE": "package", "FRODO_ENVIRONMENT": "staging",
+			"FRODO_REPO_ROOT": "/runner/work/x", "FRODO_MODULE_DIR": "/runner/work/x/apps/api",
+		},
+	}}}
+	out := BuildComment(in)
+	if !strings.Contains(out, "FRODO_IMAGE='api:abc1234'") {
+		t.Errorf("expected the resolved FRODO_IMAGE to be exported, got:\n%s", out)
+	}
+	if !strings.Contains(out, `FRODO_REPO_ROOT="$(git rev-parse --show-toplevel)"`) {
+		t.Error("repo root should be recomputed locally, not pinned to the CI path")
+	}
+	if strings.Contains(out, "/runner/work/x") {
+		t.Error("machine-specific CI paths must not leak into the reproduce script")
+	}
+	if !strings.Contains(out, "cd apps/api") || !strings.Contains(out, `docker build -t "$FRODO_IMAGE" .`) {
+		t.Errorf("missing cd + command, got:\n%s", out)
+	}
+}

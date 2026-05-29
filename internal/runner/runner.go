@@ -38,6 +38,9 @@ type StageResult struct {
 	Duration time.Duration `json:"duration"`
 	Steps    []StepResult  `json:"steps,omitempty"`
 	Note     string        `json:"note,omitempty"`
+	// Env is the resolved FRODO_* (and stage) environment the steps ran with, so
+	// failure reporting can produce a literally-runnable reproduce command.
+	Env map[string]string `json:"env,omitempty"`
 }
 
 // Result is the overall execution outcome.
@@ -285,7 +288,9 @@ func (r *Runner) runStage(ctx context.Context, p *plan.Plan, s *plan.StagePlan, 
 		return sr
 	}
 
-	env := r.stageEnv(s, m, eff, p.Context)
+	frodo := r.frodoEnv(s, m, eff, p.Context)
+	sr.Env = frodo
+	env := r.stageEnvList(frodo)
 	sr.Status = StatusSuccess
 	for _, step := range eff.Steps {
 		step := step
@@ -343,25 +348,34 @@ func (r *Runner) scope(p *plan.Plan, group string) (map[string][]*plan.StagePlan
 	return byModule, order
 }
 
-// stageEnv assembles the environment for a stage's steps. The FRODO_* variables
-// let templates locate the module and name images without hard-coded paths;
-// stage-level env (appended last) can override any of them, including FRODO_IMAGE.
-func (r *Runner) stageEnv(s *plan.StagePlan, m *discover.Module, eff templates.EffectiveStage, ctx plan.Context) []string {
+// frodoEnv returns the FRODO_* (and stage) variables for a stage. They let
+// templates locate the module and name images without hard-coded paths; a
+// stage's own env overrides them, including FRODO_IMAGE.
+func (r *Runner) frodoEnv(s *plan.StagePlan, m *discover.Module, eff templates.EffectiveStage, ctx plan.Context) map[string]string {
+	env := map[string]string{
+		"FRODO_MODULE":      s.Module,
+		"FRODO_MODULE_PATH": m.Dir,
+		"FRODO_MODULE_DIR":  filepath.Join(r.loaded.RepoRoot, filepath.FromSlash(m.Dir)),
+		"FRODO_REPO_ROOT":   r.loaded.RepoRoot,
+		"FRODO_STAGE":       s.Stage,
+		"FRODO_ENVIRONMENT": ctx.Environment,
+		"FRODO_IMAGE":       r.imageFor(s.Module),
+	}
+	for k, v := range eff.Env {
+		env[k] = v.String()
+	}
+	return env
+}
+
+// stageEnvList layers the FRODO_* env on top of the process and option env for
+// actual execution.
+func (r *Runner) stageEnvList(frodo map[string]string) []string {
 	env := os.Environ()
 	for k, v := range r.opts.Env {
 		env = append(env, k+"="+v)
 	}
-	env = append(env,
-		"FRODO_MODULE="+s.Module,
-		"FRODO_MODULE_PATH="+m.Dir,
-		"FRODO_MODULE_DIR="+filepath.Join(r.loaded.RepoRoot, filepath.FromSlash(m.Dir)),
-		"FRODO_REPO_ROOT="+r.loaded.RepoRoot,
-		"FRODO_STAGE="+s.Stage,
-		"FRODO_ENVIRONMENT="+ctx.Environment,
-		"FRODO_IMAGE="+r.imageFor(s.Module),
-	)
-	for k, v := range eff.Env {
-		env = append(env, k+"="+v.String())
+	for k, v := range frodo {
+		env = append(env, k+"="+v)
 	}
 	return env
 }
