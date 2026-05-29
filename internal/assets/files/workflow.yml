@@ -1,0 +1,60 @@
+name: Frodo CI
+
+# The only workflow Frodo CI needs. The single required status check for merge
+# is "Frodo CI / final"; all module/stage checks are calculated and tracked
+# internally by the action. Never use always() here -- the runner handles
+# cleanup, summaries, check finalization, and reporting within bounded timeouts.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+  # `submitted` belongs to pull_request_review (not pull_request); this lets the
+  # final check re-evaluate "require approval after latest commit" on reviews.
+  pull_request_review:
+    types: [submitted, dismissed, edited]
+
+  push:
+    branches: [main]
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment for CD stages
+        required: false
+        default: staging
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  group: frodo-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+  packages: write
+  deployments: write
+  id-token: write
+
+jobs:
+  final:
+    name: final
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Frodo CI
+        uses: frodo-ci/action@v1
+        with:
+          command: run
+          environment: ${{ github.event.inputs.environment || 'staging' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

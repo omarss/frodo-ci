@@ -1,0 +1,14 @@
+# Named lint/format profiles selected by modules via quality.format / quality.lint.
+# Values: required | report | off. Schema: lint.schema.json
+version: 1
+
+profiles:
+  strict:
+    format: required
+    deterministic_lint: required
+    non_deterministic_lint: report
+
+  standard:
+    format: required
+    deterministic_lint: required
+    non_deterministic_lint: report

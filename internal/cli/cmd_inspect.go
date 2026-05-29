@@ -27,13 +27,13 @@ func newReviewCommand(_ *App) *cobra.Command {
 }
 
 // newDoctorCommand performs environment and configuration health checks.
-func newDoctorCommand(_ *App) *cobra.Command {
+func newDoctorCommand(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Check the environment and configuration for common problems",
 		Args:  cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci doctor")
+			return app.runDoctor()
 		},
 	}
 }

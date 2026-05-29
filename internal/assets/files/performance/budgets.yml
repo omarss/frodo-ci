@@ -1,0 +1,19 @@
+# Performance budgets and regression policy. Schema: performance.schema.json
+version: 1
+
+budgets:
+  ci_total: 45m
+  module_default: 20m
+  validate_default: 5m
+  test_default: 20m
+  scan_default: 15m
+
+regression:
+  compare_against: main
+  max_slowdown_percent: 30
+  require_label_to_exceed: ci/budget-approved
+
+reporting:
+  github_step_summary: true
+  pr_comment: true
+  slack_on_regression: true

@@ -1,0 +1,16 @@
+# Classification of security findings into blocking vs report-only buckets.
+version: 1
+
+blocking:
+  - confirmed-secret
+  - direct-dependency-critical-cve-with-fix
+  - direct-dependency-high-cve-with-fix
+  - critical-iac-misconfiguration
+  - high-confidence-sast
+  - unsafe-pull-request-target
+
+report_only:
+  - noisy-sast
+  - speculative-taint
+  - transitive-medium-cve
+  - broad-style-suggestion

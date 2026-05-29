@@ -113,6 +113,12 @@ func (l *Loader) Get(name string) (*Template, error) {
 	return t, nil
 }
 
+// DefaultBytes returns the raw bytes of a built-in template, for `init` to
+// write into a repository's templates directory.
+func DefaultBytes(name string) ([]byte, error) {
+	return defaultsFS.ReadFile("defaults/" + name + ".yml")
+}
+
 // LoadDefault parses a built-in template by name.
 func LoadDefault(name string) (*Template, error) {
 	data, err := defaultsFS.ReadFile("defaults/" + name + ".yml")

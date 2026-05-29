@@ -1,0 +1,13 @@
+# Time-bounded security suppressions. Every suppression MUST set an expiry;
+# permanent suppressions are not allowed. Each entry requires:
+#   id, path, reason, owner, expiry, approver
+#
+# Example:
+#   - id: CVE-2025-0001
+#     path: services/cards/**
+#     reason: not reachable in our configuration; tracked in JIRA-123
+#     owner: cards-team
+#     expiry: 2026-12-31
+#     approver: security-team
+version: 1
+suppressions: []

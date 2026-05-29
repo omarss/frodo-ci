@@ -1,0 +1,21 @@
+# Named security profiles selected by modules via quality.security or
+# scan.security.profile. Schema: security.schema.json
+version: 1
+
+profiles:
+  standard:
+    fail_on_new_critical: true
+    fail_on_new_high_when_fix_available: true
+    fail_on_secrets: true
+
+  fintech-service:
+    fail_on_new_critical: true
+    fail_on_new_high_when_fix_available: true
+    fail_on_secrets: true
+    require_container_scan: true
+    require_license_scan: true
+
+  infra:
+    fail_on_new_critical: true
+    fail_on_secrets: true
+    require_iac_scan: true

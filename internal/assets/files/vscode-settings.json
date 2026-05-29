@@ -1,0 +1,35 @@
+{
+  "yaml.schemas": {
+    "./.github/frodo-ci/schemas/root.schema.json": [
+      ".github/frodo-ci.yml"
+    ],
+    "./.github/frodo-ci/schemas/module.schema.json": [
+      "**/.ci/module.yml"
+    ],
+    "./.github/frodo-ci/schemas/stage.schema.json": [
+      "**/.ci/validate.yml",
+      "**/.ci/test.yml",
+      "**/.ci/build.yml",
+      "**/.ci/package.yml",
+      "**/.ci/scan.yml",
+      "**/.ci/publish.yml",
+      "**/.ci/deploy.yml",
+      "**/.ci/verify.yml"
+    ],
+    "./.github/frodo-ci/schemas/toolchains.schema.json": [
+      ".github/frodo-ci/toolchains.yml"
+    ],
+    "./.github/frodo-ci/schemas/security.schema.json": [
+      ".github/frodo-ci/security/baseline.yml"
+    ],
+    "./.github/frodo-ci/schemas/lint.schema.json": [
+      ".github/frodo-ci/lint/rules.yml"
+    ],
+    "./.github/frodo-ci/schemas/performance.schema.json": [
+      ".github/frodo-ci/performance/budgets.yml"
+    ]
+  },
+  "yaml.validate": true,
+  "yaml.hover": true,
+  "yaml.completion": true
+}
