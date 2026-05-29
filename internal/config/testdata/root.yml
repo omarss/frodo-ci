@@ -1,0 +1,120 @@
+version: 1
+
+module_file: .ci/module.yml
+
+scan:
+  include:
+    - services/**
+    - packages/**
+    - libs/**
+    - jobs/**
+    - infra/**
+  exclude:
+    - "**/target/**"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/.git/**"
+
+stages:
+  ci:
+    - validate
+    - test
+    - build
+    - package
+    - scan
+
+  cd:
+    - publish
+    - deploy
+    - verify
+
+modules:
+  naming:
+    pattern: "^[a-z][a-z0-9-]*$"
+
+templates:
+  path: .github/frodo-ci/templates
+
+execution:
+  final_check_name: "Frodo CI / final"
+  dynamic_checks: true
+  calculate_plan_on_startup: true
+  fail_fast: true
+  full_run_timeout_minutes: 90
+  no_progress_timeout_minutes: 10
+  max_parallel_modules: 4
+  max_parallel_expensive_stages: 1
+  stop_module_on_stage_failure: true
+  stop_dependents_on_dependency_failure: true
+  stop_expensive_stages_after_validation_failure: true
+
+minutes:
+  cancel_previous_ci_runs: true
+  skip_unchanged: true
+  exact_fingerprint_match_only: true
+
+reviews:
+  ignore_author_approval: true
+  ignore_bot_approval: true
+  require_approval_after_latest_commit: true
+
+experts:
+  enabled: true
+  window: 30d
+  exclude_author: true
+  exclude_bots: true
+  require_write_access: true
+  fallback_to_owners: true
+
+security:
+  mode: smart
+  blocking_profile: strict
+  report_profile: broad
+  update_vulnerability_database: true
+  fail_on_new_critical: true
+  fail_on_new_high_when_fix_available: true
+  allow_suppression_only_with_expiry: true
+
+lint:
+  mode: smart
+  fail_on_formatting: true
+  fail_on_deterministic_lint: true
+  report_non_deterministic_lint: true
+
+performance:
+  enabled: true
+  collect_stage_timings: true
+  fail_on_budget_exceeded: true
+  compare_with_baseline: true
+
+slack:
+  enabled: true
+  notify_on:
+    - ci_failure_on_main
+    - cd_failure
+    - production_deploy_failure
+    - security_blocker
+    - framework_failure
+  channel: "#ci-alerts"
+  mention:
+    module_owners: true
+    platform_on_framework_failure: true
+
+protected_files:
+  - name: Frodo CI framework
+    files:
+      - .github/frodo-ci.yml
+      - .github/frodo-ci/**
+      - "**/.ci/module.yml"
+      - "**/.ci/*.yml"
+    require:
+      teams:
+        platform-team: 1
+
+  - name: GitHub workflow
+    files:
+      - .github/workflows/frodo-ci.yml
+    require:
+      teams:
+        devex-team: 1
+        security-team: 1

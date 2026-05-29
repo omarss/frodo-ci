@@ -1,0 +1,65 @@
+version: 1
+
+formatters:
+  java:
+    tool: spotless
+    version: pinned-by-parent-pom
+    blocking: true
+
+  typescript:
+    tool: biome
+    version: pinned
+    blocking: true
+
+  python:
+    tool: ruff
+    version: pinned
+    blocking: true
+
+  go:
+    tool: gofmt
+    version: bundled
+    blocking: true
+
+  shell:
+    tool: shfmt
+    version: pinned
+    blocking: true
+
+linters:
+  java:
+    deterministic:
+      - checkstyle
+      - error-prone
+    report_only:
+      - spotbugs
+
+  typescript:
+    deterministic:
+      - biome
+    optional:
+      - eslint
+
+  python:
+    deterministic:
+      - ruff
+
+  go:
+    deterministic:
+      - golangci-lint
+
+  shell:
+    deterministic:
+      - shellcheck
+
+  dockerfile:
+    deterministic:
+      - hadolint
+
+  github_actions:
+    deterministic:
+      - actionlint
+
+  kubernetes:
+    deterministic:
+      - kubeconform

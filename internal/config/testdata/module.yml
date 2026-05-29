@@ -1,0 +1,105 @@
+name: cards
+type: spring-service
+
+use:
+  profile: spring-service
+
+owners:
+  teams:
+    - cards-team
+
+depends_on:
+  - module: money
+    affects:
+      - test
+      - build
+      - package
+      - scan
+
+quality:
+  format: strict
+  lint: strict
+  security: fintech-service
+  performance: standard
+
+ci:
+  validate:
+    when:
+      - pom.xml
+      - src/**
+      - .ci/**
+
+  test:
+    when:
+      - pom.xml
+      - src/main/**
+      - src/test/**
+    inputs:
+      - ../../pom.xml
+      - ../../.mvn/**
+      - ../../mvnw
+
+  build:
+    when:
+      - pom.xml
+      - src/main/**
+      - src/main/resources/**
+
+  package:
+    when:
+      - pom.xml
+      - src/main/**
+      - src/main/docker/**
+
+  scan:
+    when:
+      - pom.xml
+      - src/**
+      - src/main/docker/**
+    security:
+      profile: fintech-service
+
+cd:
+  publish:
+    when:
+      - pom.xml
+      - src/main/**
+      - src/main/docker/**
+
+  deploy:
+    environments:
+      - staging
+      - production
+
+  verify:
+    environments:
+      - staging
+      - production
+
+reviews:
+  default:
+    require:
+      owners: 1
+      expert: 1
+
+  sensitive_card_data:
+    when:
+      - src/main/**/CardToken*.java
+      - src/main/**/Pan*.java
+      - src/main/**/Cvv*.java
+      - regex: (^|/)src/main/.*/(Visa|Paymentology|Tokenization).*\.java$
+    request:
+      teams:
+        - security-team
+    require:
+      owners: 1
+      expert: 1
+      teams:
+        security-team: 1
+
+performance:
+  budgets:
+    validate: 5m
+    test: 20m
+    build: 15m
+    scan: 15m

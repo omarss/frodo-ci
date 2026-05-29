@@ -1,0 +1,20 @@
+name: Test cards
+timeout_minutes: 20
+
+setup:
+  java:
+    distribution: liberica
+    version: 25
+
+cache:
+  paths:
+    - ~/.m2/repository
+
+steps:
+  - name: Run unit tests
+    working_directory: services/cards
+    run: ../../mvnw -pl services/cards -am test
+
+  - name: Run integration tests
+    working_directory: services/cards
+    run: ../../mvnw -pl services/cards -am verify -Pintegration
