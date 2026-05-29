@@ -50,6 +50,7 @@ internal/
   configlint/            # semantic config linting
   plan/                  # the deterministic startup planner
   templates/             # module templates + effective-stage merge (embedded defaults)
+  scaffold/              # module auto-detection (Maven/pnpm/go/Docker/IaC + CODEOWNERS)
   runner/                # stage execution engine (parallelism, timeouts, fail-fast)
   github/                # go-github client + Actions run context
   reviews/               # review enforcement + expert scoring (pure logic)
