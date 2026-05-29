@@ -1,0 +1,5 @@
+{
+  "name": "shared-ui",
+  "private": true,
+  "description": "Example Node library for the Frodo CI demo monorepo."
+}

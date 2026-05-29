@@ -1,0 +1,12 @@
+name: portal
+type: node-app
+
+use:
+  profile: node-app
+
+owners:
+  teams: [web-team]
+
+depends_on:
+  - module: shared-ui
+    affects: [build, test]

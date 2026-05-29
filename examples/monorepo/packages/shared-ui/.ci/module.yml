@@ -1,0 +1,8 @@
+name: shared-ui
+type: node-library
+
+use:
+  profile: node-library
+
+owners:
+  teams: [web-team]

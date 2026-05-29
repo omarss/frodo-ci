@@ -1,0 +1,14 @@
+name: vrtx-common
+type: java-library
+
+use:
+  profile: java-library
+
+owners:
+  teams: [platform-team]
+
+quality:
+  format: strict
+  lint: strict
+  security: standard
+  performance: standard

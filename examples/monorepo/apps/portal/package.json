@@ -1,0 +1,5 @@
+{
+  "name": "portal",
+  "private": true,
+  "description": "Example Node app for the Frodo CI demo monorepo."
+}

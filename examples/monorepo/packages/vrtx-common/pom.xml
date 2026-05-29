@@ -1,0 +1,5 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <artifactId>vrtx-common</artifactId>
+  <description>Shared Java library used by services.</description>
+</project>
