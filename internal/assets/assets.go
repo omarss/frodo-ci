@@ -4,6 +4,7 @@
 package assets
 
 import (
+	"bytes"
 	"embed"
 	"os"
 	"path/filepath"
@@ -36,9 +37,15 @@ type Result struct {
 	Skipped []string
 }
 
+// DefaultActionRef is the GitHub Action reference written into the generated
+// workflow unless overridden.
+const DefaultActionRef = "omarss/frodo-ci@v1"
+
 // Init scaffolds Frodo CI in repoRoot. Existing files are skipped unless force
 // is set. It also exports the JSON Schemas and writes the module templates.
-func Init(repoRoot string, force bool) (*Result, error) {
+// actionRef overrides the workflow's `uses:` action reference (empty = default),
+// which lets forks or internal mirrors point at their own published action.
+func Init(repoRoot string, force bool, actionRef string) (*Result, error) {
 	res := &Result{}
 	write := func(dest string, data []byte) error {
 		abs := filepath.Join(repoRoot, filepath.FromSlash(dest))
@@ -62,6 +69,9 @@ func Init(repoRoot string, force bool) (*Result, error) {
 		data, err := filesFS.ReadFile(it.embedded)
 		if err != nil {
 			return nil, err
+		}
+		if it.embedded == "files/workflow.yml" && actionRef != "" && actionRef != DefaultActionRef {
+			data = bytes.ReplaceAll(data, []byte(DefaultActionRef), []byte(actionRef))
 		}
 		if err := write(it.dest, data); err != nil {
 			return nil, err

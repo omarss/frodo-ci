@@ -107,6 +107,7 @@ func (a *App) runnerOptions(loaded *plan.Loaded, c cache.Cache) runner.Options {
 		StopModuleOnFailure:  ex.StopModuleOnStageFailure,
 		StopDependents:       ex.StopDependentsOnDependencyFailure,
 		Cache:                c,
+		ImagePrefix:          loaded.Root.Images.Prefix,
 		Log:                  a.Log,
 	}
 }

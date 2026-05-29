@@ -14,7 +14,7 @@ ci:
       java: {distribution: liberica, version: 25}
     steps:
       - name: Validate
-        run: ./mvnw -q -pl . -am validate
+        run: cd "$FRODO_REPO_ROOT" && ./mvnw -q -pl "$FRODO_MODULE_PATH" -am validate
 
   test:
     when: [pom.xml, src/main/**, src/test/**]
@@ -24,7 +24,7 @@ ci:
       paths: [~/.m2/repository]
     steps:
       - name: Unit and integration tests
-        run: ./mvnw -q -pl . -am verify
+        run: cd "$FRODO_REPO_ROOT" && ./mvnw -q -pl "$FRODO_MODULE_PATH" -am verify
 
   build:
     when: [pom.xml, src/main/**]
@@ -34,7 +34,7 @@ ci:
       paths: [~/.m2/repository]
     steps:
       - name: Build
-        run: ./mvnw -q -pl . -am -DskipTests package
+        run: cd "$FRODO_REPO_ROOT" && ./mvnw -q -pl "$FRODO_MODULE_PATH" -am -DskipTests package
 
   package:
     when: [pom.xml, src/main/**, src/main/docker/**, Dockerfile]

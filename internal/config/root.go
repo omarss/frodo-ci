@@ -8,6 +8,7 @@ type RootConfig struct {
 	Stages         StagesConfig    `yaml:"stages,omitempty" json:"stages,omitempty"`
 	Modules        ModulesConfig   `yaml:"modules,omitempty" json:"modules,omitempty"`
 	Templates      TemplatesConfig `yaml:"templates,omitempty" json:"templates,omitempty"`
+	Images         ImagesConfig    `yaml:"images,omitempty" json:"images,omitempty"`
 	Execution      ExecutionConfig `yaml:"execution,omitempty" json:"execution,omitempty"`
 	Minutes        MinutesConfig   `yaml:"minutes,omitempty" json:"minutes,omitempty"`
 	Reviews        RootReviews     `yaml:"reviews,omitempty" json:"reviews,omitempty"`
@@ -44,6 +45,13 @@ type NamingConfig struct {
 // TemplatesConfig points at the directory holding module templates.
 type TemplatesConfig struct {
 	Path string `yaml:"path,omitempty" json:"path,omitempty"`
+}
+
+// ImagesConfig controls how container image tags are derived for package/publish
+// stages. The runner exposes the result as $FRODO_IMAGE.
+type ImagesConfig struct {
+	// Prefix is prepended to "<module>:<tag>", e.g. "ghcr.io/acme/".
+	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
 }
 
 // ExecutionConfig controls how the final check orchestrates planned work.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/omarss/frodo-ci/internal/cache"
+	"github.com/omarss/frodo-ci/internal/discover"
 	"github.com/omarss/frodo-ci/internal/plan"
 	"github.com/omarss/frodo-ci/internal/templates"
 )
@@ -75,6 +77,7 @@ type Options struct {
 	Cache                cache.Cache
 	Scanner              SecurityScanner
 	Reporter             Reporter
+	ImagePrefix          string // prepended to "<module>:<tag>" for $FRODO_IMAGE
 	Log                  zerolog.Logger
 }
 
@@ -282,11 +285,17 @@ func (r *Runner) runStage(ctx context.Context, p *plan.Plan, s *plan.StagePlan, 
 		return sr
 	}
 
-	env := r.stageEnv(s, eff, p.Context)
+	env := r.stageEnv(s, m, eff, p.Context)
 	sr.Status = StatusSuccess
 	for _, step := range eff.Steps {
 		step := step
-		stepRes := runStep(sctx, r.loaded.RepoRoot, step.WorkingDirectory, step.Run, env, r.opts.Log.With().Str("module", s.Module).Str("stage", s.Stage).Logger())
+		// Steps default to running in the module's directory (what the stock
+		// templates assume); an explicit working_directory overrides it.
+		wd := step.WorkingDirectory
+		if wd == "" {
+			wd = m.Dir
+		}
+		stepRes := runStep(sctx, r.loaded.RepoRoot, wd, step.Run, env, r.opts.Log.With().Str("module", s.Module).Str("stage", s.Stage).Logger())
 		stepRes.Name = step.Name
 		sr.Steps = append(sr.Steps, stepRes)
 		if stepRes.Err != "" {
@@ -334,21 +343,37 @@ func (r *Runner) scope(p *plan.Plan, group string) (map[string][]*plan.StagePlan
 	return byModule, order
 }
 
-// stageEnv assembles the environment for a stage's steps.
-func (r *Runner) stageEnv(s *plan.StagePlan, eff templates.EffectiveStage, ctx plan.Context) []string {
+// stageEnv assembles the environment for a stage's steps. The FRODO_* variables
+// let templates locate the module and name images without hard-coded paths;
+// stage-level env (appended last) can override any of them, including FRODO_IMAGE.
+func (r *Runner) stageEnv(s *plan.StagePlan, m *discover.Module, eff templates.EffectiveStage, ctx plan.Context) []string {
 	env := os.Environ()
 	for k, v := range r.opts.Env {
 		env = append(env, k+"="+v)
 	}
 	env = append(env,
 		"FRODO_MODULE="+s.Module,
+		"FRODO_MODULE_PATH="+m.Dir,
+		"FRODO_MODULE_DIR="+filepath.Join(r.loaded.RepoRoot, filepath.FromSlash(m.Dir)),
+		"FRODO_REPO_ROOT="+r.loaded.RepoRoot,
 		"FRODO_STAGE="+s.Stage,
 		"FRODO_ENVIRONMENT="+ctx.Environment,
+		"FRODO_IMAGE="+r.imageFor(s.Module),
 	)
 	for k, v := range eff.Env {
 		env = append(env, k+"="+v.String())
 	}
 	return env
+}
+
+// imageFor derives the default container image name "<prefix><module>:<tag>".
+// The tag is the short commit SHA in CI, else "ci".
+func (r *Runner) imageFor(module string) string {
+	tag := "ci"
+	if sha := os.Getenv("GITHUB_SHA"); len(sha) >= 7 {
+		tag = sha[:7]
+	}
+	return r.opts.ImagePrefix + module + ":" + tag
 }
 
 func watchdog(ctx context.Context, cancel context.CancelFunc, timeout time.Duration, progress <-chan struct{}) {
