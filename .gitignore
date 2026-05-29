@@ -1,0 +1,28 @@
+# Build output
+/bin/
+/dist/
+# A stray binary built at the repo root (anchored so it does NOT match the
+# cmd/frodo-ci/ source directory).
+/frodo-ci
+*.exe
+*.out
+
+# Go
+/vendor/
+*.test
+*.prof
+coverage.out
+coverage.html
+
+# Editors / OS
+.DS_Store
+*.swp
+.idea/
+# Keep .vscode/settings.json since `frodo-ci init` generates it for consumers,
+# but ignore personal VS Code state.
+.vscode/*
+!.vscode/settings.json
+
+# Local environment
+.env
+.env.local
