@@ -14,18 +14,6 @@ import (
 	"github.com/frodo-ci/frodo-ci/internal/templates"
 )
 
-// newReviewCommand evaluates review and approval requirements for the PR.
-func newReviewCommand(_ *App) *cobra.Command {
-	return &cobra.Command{
-		Use:   "review",
-		Short: "Evaluate review, owner, and expert requirements for the current PR",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			return notImplemented("frodo-ci review")
-		},
-	}
-}
-
 // newDoctorCommand performs environment and configuration health checks.
 func newDoctorCommand(app *App) *cobra.Command {
 	return &cobra.Command{

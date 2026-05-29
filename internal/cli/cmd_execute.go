@@ -72,7 +72,9 @@ func (a *App) runExecute(ctx context.Context, group string) error {
 		return err
 	}
 
-	result := runner.New(loaded, a.runnerOptions(loaded, c)).Run(ctx, p, group)
+	opts := a.runnerOptions(loaded, c)
+	opts.Reporter = maybeReporter(ctx)
+	result := runner.New(loaded, opts).Run(ctx, p, group)
 
 	if a.JSON {
 		if err := writeJSON(a.Out, result); err != nil {

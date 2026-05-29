@@ -50,6 +50,17 @@ type SecurityScanner interface {
 	Scan(ctx context.Context, module string) (Status, string)
 }
 
+// Reporter receives stage outcomes as they complete, e.g. to create or update
+// GitHub check-runs. The final job's own exit code is the "Frodo CI / final"
+// check, so reporters only track the internal per-stage checks.
+type Reporter interface {
+	StageFinished(StageResult)
+}
+
+type noopReporter struct{}
+
+func (noopReporter) StageFinished(StageResult) {}
+
 // Options configures a Runner. Most values come from the root config's
 // execution block.
 type Options struct {
@@ -63,6 +74,7 @@ type Options struct {
 	StopDependents       bool
 	Cache                cache.Cache
 	Scanner              SecurityScanner
+	Reporter             Reporter
 	Log                  zerolog.Logger
 }
 
@@ -88,6 +100,9 @@ func New(loaded *plan.Loaded, opts Options) *Runner {
 	}
 	if opts.Cache == nil {
 		opts.Cache = cache.Noop{}
+	}
+	if opts.Reporter == nil {
+		opts.Reporter = noopReporter{}
 	}
 	return &Runner{loaded: loaded, opts: opts}
 }
@@ -121,6 +136,7 @@ func (r *Runner) Run(ctx context.Context, p *plan.Plan, group string) *Result {
 		mu.Lock()
 		res.Stages = append(res.Stages, sr)
 		mu.Unlock()
+		r.opts.Reporter.StageFinished(sr)
 		select {
 		case progress <- struct{}{}:
 		default:
