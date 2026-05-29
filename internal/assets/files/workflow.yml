@@ -82,6 +82,22 @@ jobs:
           restore-keys: |
             frodo-ci-cache-
 
+      # Persist language package stores so dependency install and the shared
+      # dependency-graph build start warm instead of cold every run. Keyed by the
+      # lockfiles, with a restore-keys fallback so a partial hit still seeds the
+      # store. Modules build self-only and reuse already-built dependency modules
+      # (Frodo runs dependencies before dependents), so this caches install cost,
+      # not redundant compiles. Add the store path for any other toolchain you use.
+      - name: Toolchain cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.local/share/pnpm/store
+            ~/.m2/repository
+          key: frodo-ci-toolchains-${{ hashFiles('**/pnpm-lock.yaml', '**/pom.xml') }}
+          restore-keys: |
+            frodo-ci-toolchains-
+
       - name: Run Frodo CI
         uses: omarss/frodo-ci@v1
         with:

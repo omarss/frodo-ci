@@ -141,6 +141,29 @@ depends_on:
 Optional `.ci/<stage>.yml` files override a stage's steps when the template is
 not enough.
 
+### Dependencies build once — don't rebuild the closure
+
+Frodo runs a module's `depends_on` modules **before** the module itself, in the
+same job on the same filesystem. So by the time `cards` builds, `money` has
+already been built and its output (`dist/`, installed `~/.m2` artifacts, …) is on
+disk. **Each module should build only itself** and reuse what its dependencies
+already produced:
+
+```yaml
+# do this — self-only; deps are already built
+run: pnpm -s build          # or: ./mvnw -pl "$FRODO_MODULE_PATH" -am
+
+# not this — rebuilds the whole dependency closure on every module, every stage
+run: pnpm --filter "{.}..." build   # trailing "..." pulls in every dependency
+```
+
+Filtering by the dependency closure re-compiles the same shared packages once per
+dependent and once per stage — in a monorepo where every app shares the same
+libraries, that is most of your CI time. The fix is to **model each shared
+library/client as its own Frodo module** (`scaffold` detects them) and let the
+dependency order do the work; the per-module build then stays self-only. The
+generated workflow caches the pnpm/Maven stores so even the install starts warm.
+
 ### Stage environment
 
 Each step runs **in its module's directory** by default (override per step with
