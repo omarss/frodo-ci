@@ -1,0 +1,19 @@
+# golangci-lint configuration for Frodo CI.
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - misspell
+
+issues:
+  exclude-rules:
+    # Test helpers frequently ignore errors deliberately.
+    - path: _test\.go
+      linters: [errcheck]

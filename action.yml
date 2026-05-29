@@ -1,0 +1,26 @@
+name: Frodo CI
+description: Opinionated modular CI/CD framework for monorepos
+
+inputs:
+  command:
+    required: true
+    description: Frodo CI command to run (run, ci, cd, plan, ...)
+    default: run
+  environment:
+    required: false
+    description: Target deployment environment for CD stages
+    default: staging
+
+runs:
+  using: composite
+  steps:
+    - name: Install Frodo CI
+      shell: bash
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/frodo-ci/frodo-ci/main/install.sh | bash
+
+    - name: Run Frodo CI
+      shell: bash
+      # GITHUB_TOKEN and SLACK_WEBHOOK_URL are read from the calling step's env.
+      run: |
+        frodo-ci "${{ inputs.command }}" --environment "${{ inputs.environment }}"
