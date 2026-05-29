@@ -9,8 +9,8 @@ import (
 	"reflect"
 
 	"github.com/invopop/jsonschema"
+	orderedmap "github.com/pb33f/ordered-map/v2"
 	jsv "github.com/santhosh-tekuri/jsonschema/v6"
-	orderedmap "github.com/wk8/go-ordered-map/v2"
 
 	"github.com/omarss/frodo-ci/internal/config"
 )

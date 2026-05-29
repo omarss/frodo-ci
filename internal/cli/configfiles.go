@@ -67,8 +67,8 @@ func discoverConfigFiles(root string) ([]configFile, error) {
 		}
 		rel, _ := filepath.Rel(root, p)
 		base := filepath.Base(p)
-		switch {
-		case base == "module.yml" || base == "module.yaml":
+		switch base {
+		case "module.yml", "module.yaml":
 			files = append(files, configFile{Kind: schema.KindModule, Path: p, Rel: rel})
 		default:
 			name := strings.TrimSuffix(strings.TrimSuffix(base, ".yaml"), ".yml")
