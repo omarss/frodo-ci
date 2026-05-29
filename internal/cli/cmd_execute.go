@@ -74,6 +74,7 @@ func (a *App) runExecute(ctx context.Context, group string) error {
 
 	opts := a.runnerOptions(loaded, c)
 	opts.Reporter = maybeReporter(ctx)
+	opts.Scanner = a.buildScanner(loaded, p)
 	result := runner.New(loaded, opts).Run(ctx, p, group)
 
 	if a.JSON {

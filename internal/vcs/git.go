@@ -74,6 +74,16 @@ func (g *Git) MergeBase(a, b string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
+// ShowFile returns the contents of a repo-relative file at a given ref, e.g.
+// the base-branch revision of the root config for anti-weakening comparison.
+func (g *Git) ShowFile(ref, path string) ([]byte, error) {
+	out, err := g.run("show", ref+":"+path)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(out), nil
+}
+
 // RevParse resolves a ref to a commit SHA.
 func (g *Git) RevParse(ref string) (string, error) {
 	out, err := g.run("rev-parse", ref)

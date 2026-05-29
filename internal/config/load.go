@@ -41,6 +41,25 @@ func loadYAML(path string, dst any) (*Source, error) {
 	return src, nil
 }
 
+// ParseRoot parses a root config from bytes (e.g. a base-branch revision read
+// via `git show`), used by anti-weakening comparison.
+func ParseRoot(data []byte) (*RootConfig, error) {
+	var c RootConfig
+	if err := yaml.Unmarshal(data, &c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// ParseModule parses a module config from bytes.
+func ParseModule(data []byte) (*ModuleConfig, error) {
+	var c ModuleConfig
+	if err := yaml.Unmarshal(data, &c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 // LoadRoot loads the repository root config (.github/frodo-ci.yml).
 func LoadRoot(path string) (*RootConfig, *Source, error) {
 	var c RootConfig

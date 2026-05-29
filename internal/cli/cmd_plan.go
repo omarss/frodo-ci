@@ -47,10 +47,10 @@ func (a *App) runPlan() error {
 		}
 		return nil
 	}
-	return a.printPlan(p)
+	return a.printPlan(loaded, p)
 }
 
-func (a *App) printPlan(p *plan.Plan) error {
+func (a *App) printPlan(loaded *plan.Loaded, p *plan.Plan) error {
 	if len(p.Problems) > 0 {
 		fmt.Fprintln(a.Out, "Configuration problems:")
 		printProblems(a.Out, p.Problems)
@@ -79,6 +79,7 @@ func (a *App) printPlan(p *plan.Plan) error {
 	c := p.Summary()
 	fmt.Fprintf(a.Out, "\n%d module(s), %d stage(s) planned, %d skipped via cache\n",
 		c.Modules, c.RequiredStages, c.SkippedStages)
+	a.printGovernance(loaded, p)
 	if p.HasErrors() {
 		fmt.Fprintln(a.Out, "\nplan is invalid: fix the configuration errors above")
 		return ErrExitQuiet
