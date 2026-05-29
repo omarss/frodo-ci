@@ -22,6 +22,9 @@ type StepResult struct {
 	Duration time.Duration `json:"duration"`
 	Err      string        `json:"error,omitempty"`
 	TimedOut bool          `json:"timed_out,omitempty"`
+	// Output is a truncated tail of the step's combined output, kept on failure
+	// so reporting can show the actual error without anyone re-running the step.
+	Output string `json:"output,omitempty"`
 }
 
 // runStep runs a single step's command under bash in the given working
@@ -46,6 +49,7 @@ func runStep(ctx context.Context, repoRoot, workdir, run string, env []string, l
 		return res
 	}
 	res.Err = err.Error()
+	res.Output = tailString(string(out), 30, 3000)
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {
 		res.ExitCode = ee.ExitCode()
@@ -56,4 +60,22 @@ func runStep(ctx context.Context, repoRoot, workdir, run string, env []string, l
 		res.TimedOut = true
 	}
 	return res
+}
+
+// tailString returns the last maxLines lines of s, further capped to the last
+// maxBytes bytes, so failure output stays readable in a PR comment.
+func tailString(s string, maxLines, maxBytes int) string {
+	s = strings.TrimRight(s, "\n")
+	if s == "" {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) > maxLines {
+		lines = lines[len(lines)-maxLines:]
+	}
+	out := strings.Join(lines, "\n")
+	if len(out) > maxBytes {
+		out = "...\n" + out[len(out)-maxBytes:]
+	}
+	return out
 }
