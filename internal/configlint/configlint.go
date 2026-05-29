@@ -269,9 +269,9 @@ func checkSuppressions(in Input) []Problem {
 		case s.Expiry.IsZero():
 			ps = append(ps, Problem{Error, path,
 				fmt.Sprintf("suppression %q has no expiry (permanent suppressions are not allowed)", s.ID)})
-		case s.Expiry.Time.Before(in.Now):
+		case s.Expiry.Before(in.Now):
 			ps = append(ps, Problem{Error, path,
-				fmt.Sprintf("suppression %q expired on %s", s.ID, s.Expiry.Time.Format("2006-01-02"))})
+				fmt.Sprintf("suppression %q expired on %s", s.ID, s.Expiry.Format("2006-01-02"))})
 		}
 		if s.Owner == "" || s.Approver == "" || s.Reason == "" {
 			ps = append(ps, Problem{Error, path,

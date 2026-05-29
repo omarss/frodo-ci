@@ -2,7 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/rs/zerolog"
@@ -26,11 +25,4 @@ type App struct {
 	Log zerolog.Logger
 	Out io.Writer
 	Err io.Writer
-}
-
-// notImplemented is a placeholder returned by commands whose behavior is
-// delivered in a later build phase. It keeps the CLI surface complete and
-// testable while implementation lands incrementally.
-func notImplemented(feature string) error {
-	return fmt.Errorf("%s is not implemented yet", feature)
 }

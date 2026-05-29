@@ -1,3 +1,5 @@
+// Package cli wires the frodo-ci command tree (cobra) to the internal packages
+// and carries resolved global options into each subcommand.
 package cli
 
 import (

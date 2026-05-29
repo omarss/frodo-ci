@@ -20,7 +20,7 @@ func New(level string, pretty bool, w io.Writer) zerolog.Logger {
 	if w == nil {
 		w = os.Stderr
 	}
-	var out io.Writer = w
+	out := w
 	if pretty {
 		out = zerolog.ConsoleWriter{Out: w, TimeFormat: time.RFC3339}
 	}

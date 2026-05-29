@@ -19,7 +19,7 @@ type Finding struct {
 // rejects those separately).
 func IsSuppressed(f Finding, sups []config.Suppression, now time.Time) bool {
 	for _, s := range sups {
-		if s.Expiry.IsZero() || !s.Expiry.Time.After(now) {
+		if s.Expiry.IsZero() || !s.Expiry.After(now) {
 			continue
 		}
 		if s.ID != "" && s.ID != f.RuleID {
