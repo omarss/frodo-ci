@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/config"
 )
 
 func has(ws []Weakening, substr string) bool {

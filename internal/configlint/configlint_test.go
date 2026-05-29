@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/discover"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/discover"
 )
 
 func defaultRoot() *config.RootConfig {

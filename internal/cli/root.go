@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/frodo-ci/frodo-ci/internal/logging"
-	"github.com/frodo-ci/frodo-ci/internal/version"
+	"github.com/omarss/frodo-ci/internal/logging"
+	"github.com/omarss/frodo-ci/internal/version"
 )
 
 // NewRootCommand builds the full frodo-ci command tree.

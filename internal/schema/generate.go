@@ -12,7 +12,7 @@ import (
 	jsv "github.com/santhosh-tekuri/jsonschema/v6"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/config"
 )
 
 // Kind identifies a config schema.

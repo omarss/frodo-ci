@@ -11,16 +11,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/frodo-ci/frodo-ci/internal/cache"
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/configlint"
-	"github.com/frodo-ci/frodo-ci/internal/discover"
-	"github.com/frodo-ci/frodo-ci/internal/fingerprint"
-	"github.com/frodo-ci/frodo-ci/internal/graph"
-	"github.com/frodo-ci/frodo-ci/internal/match"
-	"github.com/frodo-ci/frodo-ci/internal/schema"
-	"github.com/frodo-ci/frodo-ci/internal/templates"
-	"github.com/frodo-ci/frodo-ci/internal/vcs"
+	"github.com/omarss/frodo-ci/internal/cache"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/configlint"
+	"github.com/omarss/frodo-ci/internal/discover"
+	"github.com/omarss/frodo-ci/internal/fingerprint"
+	"github.com/omarss/frodo-ci/internal/graph"
+	"github.com/omarss/frodo-ci/internal/match"
+	"github.com/omarss/frodo-ci/internal/schema"
+	"github.com/omarss/frodo-ci/internal/templates"
+	"github.com/omarss/frodo-ci/internal/vcs"
 )
 
 // RootConfigPath is the repo-relative path to the root config.

@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/frodo-ci/frodo-ci/internal/assets"
-	"github.com/frodo-ci/frodo-ci/internal/templates"
+	"github.com/omarss/frodo-ci/internal/assets"
+	"github.com/omarss/frodo-ci/internal/templates"
 )
 
 // newInitCommand bootstraps Frodo CI in a repository.

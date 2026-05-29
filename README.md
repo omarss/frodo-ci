@@ -23,7 +23,7 @@ through **one** standard workflow and **one** required merge check.
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/frodo-ci/frodo-ci/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/omarss/frodo-ci/main/install.sh | bash
 frodo-ci doctor
 ```
 

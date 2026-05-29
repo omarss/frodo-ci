@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/discover"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/discover"
 )
 
 func mod(name, dir string, deps ...config.Dependency) *discover.Module {

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/config"
 )
 
 func write(t *testing.T, path, content string) {

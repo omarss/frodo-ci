@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/frodo-ci/frodo-ci/internal/configlint"
-	"github.com/frodo-ci/frodo-ci/internal/fingerprint"
-	"github.com/frodo-ci/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/configlint"
+	"github.com/omarss/frodo-ci/internal/fingerprint"
+	"github.com/omarss/frodo-ci/internal/plan"
 )
 
 // newPlanCommand prints the execution plan calculated at startup.

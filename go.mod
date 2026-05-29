@@ -1,4 +1,4 @@
-module github.com/frodo-ci/frodo-ci
+module github.com/omarss/frodo-ci
 
 go 1.25.0
 

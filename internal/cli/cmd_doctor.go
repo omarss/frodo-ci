@@ -5,11 +5,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/frodo-ci/frodo-ci/internal/configlint"
-	"github.com/frodo-ci/frodo-ci/internal/plan"
-	"github.com/frodo-ci/frodo-ci/internal/templates"
-	"github.com/frodo-ci/frodo-ci/internal/vcs"
-	"github.com/frodo-ci/frodo-ci/internal/version"
+	"github.com/omarss/frodo-ci/internal/configlint"
+	"github.com/omarss/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/templates"
+	"github.com/omarss/frodo-ci/internal/vcs"
+	"github.com/omarss/frodo-ci/internal/version"
 )
 
 type healthCheck struct {

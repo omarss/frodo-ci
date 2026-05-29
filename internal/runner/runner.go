@@ -11,9 +11,9 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/frodo-ci/frodo-ci/internal/cache"
-	"github.com/frodo-ci/frodo-ci/internal/plan"
-	"github.com/frodo-ci/frodo-ci/internal/templates"
+	"github.com/omarss/frodo-ci/internal/cache"
+	"github.com/omarss/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/templates"
 )
 
 // Status is a stage or module outcome.

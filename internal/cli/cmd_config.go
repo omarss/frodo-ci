@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/frodo-ci/frodo-ci/internal/configlint"
-	"github.com/frodo-ci/frodo-ci/internal/plan"
-	"github.com/frodo-ci/frodo-ci/internal/schema"
+	"github.com/omarss/frodo-ci/internal/configlint"
+	"github.com/omarss/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/schema"
 )
 
 // newValidateConfigCommand validates configuration against the JSON Schemas.

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Frodo CI installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/frodo-ci/frodo-ci/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/omarss/frodo-ci/main/install.sh | bash
 #
 # Downloads the latest release binary for the current OS/arch, falling back to
 # `go install` from source when a prebuilt binary is unavailable.
 set -euo pipefail
 
-REPO="frodo-ci/frodo-ci"
+REPO="omarss/frodo-ci"
 BINARY="frodo-ci"
 VERSION="${FRODO_CI_VERSION:-latest}"
 

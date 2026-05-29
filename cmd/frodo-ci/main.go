@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/frodo-ci/frodo-ci/internal/cli"
+	"github.com/omarss/frodo-ci/internal/cli"
 )
 
 func main() {

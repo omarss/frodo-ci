@@ -7,8 +7,8 @@
 package plan
 
 import (
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/configlint"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/configlint"
 )
 
 // Context describes the run that the plan is being calculated for.

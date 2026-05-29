@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/frodo-ci/frodo-ci/internal/cache"
-	"github.com/frodo-ci/frodo-ci/internal/configlint"
+	"github.com/omarss/frodo-ci/internal/cache"
+	"github.com/omarss/frodo-ci/internal/configlint"
 )
 
 func gitOrSkip(t *testing.T) {

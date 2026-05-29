@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/schema"
-	"github.com/frodo-ci/frodo-ci/internal/templates"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/schema"
+	"github.com/omarss/frodo-ci/internal/templates"
 )
 
 // newDoctorCommand performs environment and configuration health checks.

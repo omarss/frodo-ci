@@ -3,12 +3,12 @@ package cli
 import (
 	"os"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/github"
-	"github.com/frodo-ci/frodo-ci/internal/perf"
-	"github.com/frodo-ci/frodo-ci/internal/plan"
-	"github.com/frodo-ci/frodo-ci/internal/runner"
-	"github.com/frodo-ci/frodo-ci/internal/slack"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/github"
+	"github.com/omarss/frodo-ci/internal/perf"
+	"github.com/omarss/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/runner"
+	"github.com/omarss/frodo-ci/internal/slack"
 )
 
 // reportRun emits the performance summary and Slack notifications after a run.

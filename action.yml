@@ -17,7 +17,7 @@ runs:
     - name: Install Frodo CI
       shell: bash
       run: |
-        curl -fsSL https://raw.githubusercontent.com/frodo-ci/frodo-ci/main/install.sh | bash
+        curl -fsSL https://raw.githubusercontent.com/omarss/frodo-ci/main/install.sh | bash
 
     - name: Run Frodo CI
       shell: bash

@@ -7,11 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/github"
-	"github.com/frodo-ci/frodo-ci/internal/plan"
-	"github.com/frodo-ci/frodo-ci/internal/reviews"
-	"github.com/frodo-ci/frodo-ci/internal/runner"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/github"
+	"github.com/omarss/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/reviews"
+	"github.com/omarss/frodo-ci/internal/runner"
 )
 
 // githubReporter creates one internal check-run per stage as it finishes. The

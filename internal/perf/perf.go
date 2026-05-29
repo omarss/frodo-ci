@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/config"
 )
 
 // StageTiming is one stage's measured duration.

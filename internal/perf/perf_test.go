@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/config"
 )
 
 func dur(s string) config.Duration {

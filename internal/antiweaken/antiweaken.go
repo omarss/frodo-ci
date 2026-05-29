@@ -5,7 +5,7 @@ package antiweaken
 import (
 	"fmt"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/config"
 )
 
 // Weakening is a single governance-weakening change.

@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/discover"
-	"github.com/frodo-ci/frodo-ci/internal/match"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/discover"
+	"github.com/omarss/frodo-ci/internal/match"
 )
 
 // Edge is a dependency: From depends on To, and the listed Affects stages of

@@ -14,8 +14,8 @@ import (
 
 	"github.com/goccy/go-yaml"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/discover"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/discover"
 )
 
 //go:embed defaults/*.yml

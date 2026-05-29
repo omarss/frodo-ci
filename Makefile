@@ -4,7 +4,7 @@
 # Run `make help` to see available targets.
 
 BINARY  := frodo-ci
-PKG     := github.com/frodo-ci/frodo-ci
+PKG     := github.com/omarss/frodo-ci
 CMD_PKG := ./cmd/frodo-ci
 BIN_DIR := bin
 BIN     := $(BIN_DIR)/$(BINARY)

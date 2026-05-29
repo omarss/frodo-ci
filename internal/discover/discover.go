@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/match"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/match"
 )
 
 // Module is a discovered module: its location, parsed config, and any present

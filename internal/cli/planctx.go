@@ -4,9 +4,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/frodo-ci/frodo-ci/internal/cache"
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/cache"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/plan"
 )
 
 // planContext derives the plan context from CLI flags and the GitHub Actions

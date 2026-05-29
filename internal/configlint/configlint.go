@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/discover"
-	"github.com/frodo-ci/frodo-ci/internal/graph"
-	"github.com/frodo-ci/frodo-ci/internal/schema"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/discover"
+	"github.com/omarss/frodo-ci/internal/graph"
+	"github.com/omarss/frodo-ci/internal/schema"
 )
 
 // Severity classifies a problem.

@@ -3,8 +3,8 @@ package security
 import (
 	"time"
 
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/match"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/match"
 )
 
 // Finding is a single security finding to be classified or suppressed.

@@ -3,8 +3,8 @@
 package protected
 
 import (
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/match"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/match"
 )
 
 // Match is a triggered protected-file rule.

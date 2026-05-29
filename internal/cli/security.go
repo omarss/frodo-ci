@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/frodo-ci/frodo-ci/internal/antiweaken"
-	"github.com/frodo-ci/frodo-ci/internal/config"
-	"github.com/frodo-ci/frodo-ci/internal/plan"
-	"github.com/frodo-ci/frodo-ci/internal/protected"
-	"github.com/frodo-ci/frodo-ci/internal/runner"
-	"github.com/frodo-ci/frodo-ci/internal/security"
-	"github.com/frodo-ci/frodo-ci/internal/vcs"
+	"github.com/omarss/frodo-ci/internal/antiweaken"
+	"github.com/omarss/frodo-ci/internal/config"
+	"github.com/omarss/frodo-ci/internal/plan"
+	"github.com/omarss/frodo-ci/internal/protected"
+	"github.com/omarss/frodo-ci/internal/runner"
+	"github.com/omarss/frodo-ci/internal/security"
+	"github.com/omarss/frodo-ci/internal/vcs"
 )
 
 // securityAdapter bridges security.Scanner to the runner's SecurityScanner hook

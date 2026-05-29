@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/frodo-ci/frodo-ci/internal/schema"
+	"github.com/omarss/frodo-ci/internal/schema"
 )
 
 // configFile pairs a config file with the schema kind that validates it.

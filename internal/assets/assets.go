@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/frodo-ci/frodo-ci/internal/schema"
-	"github.com/frodo-ci/frodo-ci/internal/templates"
+	"github.com/omarss/frodo-ci/internal/schema"
+	"github.com/omarss/frodo-ci/internal/templates"
 )
 
 //go:embed files
