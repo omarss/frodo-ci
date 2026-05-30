@@ -56,8 +56,8 @@ func (a *App) runInit(force bool, actionRef string) error {
 
 // newInitModuleCommand scaffolds a new module's .ci/module.yml.
 func newInitModuleCommand(app *App) *cobra.Command {
-	var name, typ, path, owner string
-	var dependsOn []string
+	var name, typ, path, owner, review string
+	var dependsOn, reviewPaths []string
 	var force bool
 	cmd := &cobra.Command{
 		Use:   "init-module",
@@ -71,17 +71,25 @@ func newInitModuleCommand(app *App) *cobra.Command {
 	f.StringVar(&owner, "owner", "", "owning team (required)")
 	f.StringArrayVar(&dependsOn, "depends-on", nil,
 		"dependency edge, repeatable: --depends-on money[:affects=test,build,scan]")
+	f.StringVar(&review, "review", "",
+		"default review rule, e.g. --review owners=1,expert=1,teams=platform:1")
+	f.StringArrayVar(&reviewPaths, "review-path", nil,
+		"path-scoped review rule, repeatable: --review-path \"src/**/settlements/**:teams=security:1\"")
 	f.BoolVar(&force, "force", false, "overwrite an existing module.yml")
 	for _, req := range []string{"name", "type", "path", "owner"} {
 		_ = cmd.MarkFlagRequired(req)
 	}
 	cmd.RunE = func(*cobra.Command, []string) error {
-		return app.runInitModule(name, typ, path, owner, parseDependsOn(dependsOn), force)
+		specs, err := parseReviewSpecs(review, reviewPaths)
+		if err != nil {
+			return err
+		}
+		return app.runInitModule(name, typ, path, owner, parseDependsOn(dependsOn), specs, force)
 	}
 	return cmd
 }
 
-func (a *App) runInitModule(name, typ, path, owner string, deps []config.Dependency, force bool) error {
+func (a *App) runInitModule(name, typ, path, owner string, deps []config.Dependency, reviews []reviewSpec, force bool) error {
 	dest := filepath.Join(a.RepoRoot, filepath.FromSlash(path), ".ci", "module.yml")
 	if !force {
 		if _, err := os.Stat(dest); err == nil {
@@ -95,15 +103,16 @@ func (a *App) runInitModule(name, typ, path, owner string, deps []config.Depende
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(dest, []byte(renderModule(name, typ, owner, deps)), 0o644); err != nil {
+	if err := os.WriteFile(dest, []byte(renderModule(name, typ, owner, deps, reviews)), 0o644); err != nil {
 		return err
 	}
 	fmt.Fprintf(a.Out, "created %s\n", filepath.Join(path, ".ci", "module.yml"))
 	return nil
 }
 
-// renderModule produces a module.yml body, including any dependency edges.
-func renderModule(name, typ, owner string, deps []config.Dependency) string {
+// renderModule produces a module.yml body, including any dependency edges and
+// review rules.
+func renderModule(name, typ, owner string, deps []config.Dependency, reviews []reviewSpec) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "name: %s\ntype: %s\n\nuse:\n  profile: %s\n\nowners:\n  teams:\n    - %s\n",
 		name, typ, typ, owner)
@@ -116,6 +125,7 @@ func renderModule(name, typ, owner string, deps []config.Dependency) string {
 			}
 		}
 	}
+	b.WriteString(renderReviews(reviews))
 	return b.String()
 }
 

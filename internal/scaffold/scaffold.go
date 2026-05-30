@@ -177,6 +177,14 @@ func Render(m Module) ([]byte, error) {
 	for _, d := range m.DependsOn {
 		mc.DependsOn = append(mc.DependsOn, config.Dependency{Module: d.Module, Affects: d.Affects})
 	}
+	// Derive a default review rule from CODEOWNERS coverage: a module with a
+	// resolved owner team requires one owner approval. Edit or remove as needed.
+	if len(mc.Owners.Teams) > 0 {
+		one := 1
+		mc.Reviews = map[string]config.ReviewRule{
+			"default": {Require: config.ReviewRequire{Owners: &one}},
+		}
+	}
 	return yaml.Marshal(mc)
 }
 

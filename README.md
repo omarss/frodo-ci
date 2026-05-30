@@ -205,7 +205,7 @@ Run any command with `--help` for details. Global flags apply to all of them.
 | Command | What it does |
 |---|---|
 | `init` | Scaffold Frodo CI into the repository (`--action-ref` for forks; `--force`) |
-| `init-module --name --type --path --owner` | Scaffold a module's `.ci/module.yml` (`--depends-on m[:affects=a,b]` repeatable; `--force`) |
+| `init-module --name --type --path --owner` | Scaffold a module's `.ci/module.yml` (`--depends-on m[:affects=a,b]` and `--review owners=1,expert=1` / `--review-path "glob:teams=security:1"` repeatable; `--force`) |
 | `scaffold` | Detect modules from build metadata (Maven/pnpm/go/Docker/IaC), resolve intra-repo dependencies into `depends_on` edges, and propose `.ci/module.yml` files (`--write` to apply, `--owner` fallback) |
 | `sync-workflow` | Regenerate the workflow's toolchain setup from repo metadata (`engines.node`/`.nvmrc`/`pom.xml`/`go.mod`/`packageManager`) and modules' `setup:` blocks, using SHA-pinned `setup-*` actions (`--check` to verify in CI) |
 | `validate-config` | Validate config against the JSON Schemas |
