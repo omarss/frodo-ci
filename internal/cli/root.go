@@ -43,6 +43,7 @@ func NewRootCommand() *cobra.Command {
 		newInitCommand(app),
 		newInitModuleCommand(app),
 		newScaffoldCommand(app),
+		newSyncWorkflowCommand(app),
 		newValidateConfigCommand(app),
 		newLintConfigCommand(app),
 		newPlanCommand(app),
