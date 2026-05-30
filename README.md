@@ -215,6 +215,7 @@ Run any command with `--help` for details. Global flags apply to all of them.
 | `fingerprint <module.stage>` | Deterministic fingerprint for a stage (`--inputs` to list inputs) |
 | `run` / `ci` / `cd` | Execute the plan (all / CI-only / CD-only) — the final check |
 | `review` | Evaluate review/owner/expert requirements for the PR |
+| `suppress add/list/prune` | Manage security suppressions via CLI (`add` requires a future `--expiry`; `prune` drops expired) |
 | `doctor` | Environment + configuration health |
 | `schemas export` | (Re)write the JSON Schemas |
 | `templates list` / `templates explain <name>` | Inspect module templates |
