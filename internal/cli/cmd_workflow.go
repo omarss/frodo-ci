@@ -20,8 +20,8 @@ const (
 )
 
 // setupAction describes how to provision a toolchain via a maintained, SHA-pinned
-// setup-* action. extra holds steps appended after the setup step (e.g. corepack
-// for pnpm), already indented to the step level.
+// setup-* action. Node additionally gets a corepack/pnpm step appended, rendered
+// with the repo's resolved pnpm version.
 type setupAction struct {
 	order          int
 	stepName       string
@@ -30,7 +30,6 @@ type setupAction struct {
 	defaultVersion string
 	distKey        string // optional distribution key (java)
 	defaultDist    string
-	extra          string
 }
 
 // setupActions maps a declared toolchain to its setup action. Tools without an
@@ -41,8 +40,7 @@ var setupActions = map[string]setupAction{
 		distKey: "distribution", defaultDist: "liberica",
 		uses: "actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0"},
 	"node": {order: 1, stepName: "Set up Node", versionKey: "node-version", defaultVersion: "22",
-		uses:  "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0",
-		extra: "      - name: Enable pnpm\n        shell: bash\n        run: corepack enable && corepack prepare pnpm@latest --activate"},
+		uses: "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0"},
 	"go": {order: 2, stepName: "Set up Go", versionKey: "go-version", defaultVersion: "1.25",
 		uses: "actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0"},
 }
@@ -65,42 +63,63 @@ func newSyncWorkflowCommand(app *App) *cobra.Command {
 }
 
 func (a *App) runSyncWorkflow(check bool) error {
-	loaded, err := plan.Load(a.RepoRoot, time.Now())
+	path, original, updated, unknown, err := a.renderManagedWorkflow()
 	if err != nil {
 		return err
 	}
-	tools, unknown := collectToolchains(loaded)
 	for _, u := range unknown {
 		fmt.Fprintf(a.Out, "warning: no setup action for toolchain %q — add its setup step manually\n", u)
 	}
-
-	path := filepath.Join(a.RepoRoot, filepath.FromSlash(workflowRelPath))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read %s (run `frodo-ci init` first?): %w", workflowRelPath, err)
-	}
-	updated, err := replaceSetupBlock(string(data), renderSetupBlock(tools))
-	if err != nil {
-		return err
-	}
-	if updated == string(data) {
-		fmt.Fprintln(a.Out, "workflow already in sync with modules' setup: blocks")
+	if updated == original {
+		fmt.Fprintln(a.Out, "workflow already in sync with repo toolchains")
 		return nil
 	}
 	if check {
-		return fmt.Errorf("%s is out of sync with modules' setup: blocks — run `frodo-ci sync-workflow`", workflowRelPath)
+		return fmt.Errorf("%s is out of sync with repo toolchains — run `frodo-ci sync-workflow`", workflowRelPath)
 	}
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
 		return err
 	}
-	fmt.Fprintf(a.Out, "updated %s from %d toolchain(s)\n", workflowRelPath, len(tools))
+	fmt.Fprintf(a.Out, "updated %s\n", workflowRelPath)
 	return nil
 }
 
-// collectToolchains unions every module's effective-stage setup: blocks, keeping
-// the highest version per tool. It returns the resolved toolchains (in render
-// order) and any declared tools with no known setup action.
-func collectToolchains(loaded *plan.Loaded) ([]toolchain, []string) {
+// renderManagedWorkflow regenerates the workflow's setup block from repo metadata
+// and module setup: blocks, returning the workflow path, its current content, the
+// regenerated content, and any toolchains with no known setup action.
+func (a *App) renderManagedWorkflow() (path, original, updated string, unknown []string, err error) {
+	loaded, err := plan.Load(a.RepoRoot, time.Now())
+	if err != nil {
+		return "", "", "", nil, err
+	}
+	detected := detectToolchains(a.RepoRoot)
+	tools, unk := collectToolchains(loaded, detected)
+	path = filepath.Join(a.RepoRoot, filepath.FromSlash(workflowRelPath))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return path, "", "", unk, fmt.Errorf("read %s (run `frodo-ci init` first?): %w", workflowRelPath, err)
+	}
+	upd, err := replaceSetupBlock(string(data), renderSetupBlock(tools, detected.pnpm))
+	return path, string(data), upd, unk, err
+}
+
+// syncWorkflowAfterInit best-effort regenerates the setup block so a fresh init
+// already reflects the repo's toolchains; failures are non-fatal.
+func (a *App) syncWorkflowAfterInit() {
+	path, original, updated, _, err := a.renderManagedWorkflow()
+	if err != nil || updated == original {
+		return
+	}
+	_ = os.WriteFile(path, []byte(updated), 0o644)
+}
+
+// collectToolchains unions every module's effective-stage setup: blocks (keeping
+// the highest version per tool), then lets the repo's own metadata win: a
+// detected version overrides the template default, and a toolchain the repo
+// clearly uses (package.json / pom.xml / go.mod) is included even if no module
+// declared it. It returns the resolved toolchains (in render order) and any
+// declared tools with no known setup action.
+func collectToolchains(loaded *plan.Loaded, detected detectedToolchains) ([]toolchain, []string) {
 	best := map[string]toolchain{}
 	unknownSet := map[string]bool{}
 	for _, m := range loaded.Modules {
@@ -122,6 +141,19 @@ func collectToolchains(loaded *plan.Loaded) ([]toolchain, []string) {
 			}
 		}
 	}
+	// Repo metadata wins: add detected toolchains and override versions with the
+	// repo's real requirement (e.g. engines.node), not the template default.
+	for tool, ver := range detected.tools {
+		if _, ok := setupActions[tool]; !ok {
+			continue
+		}
+		tc := best[tool] // zero value if absent
+		tc.tool = tool
+		if ver != "" {
+			tc.version = ver
+		}
+		best[tool] = tc
+	}
 	tools := make([]toolchain, 0, len(best))
 	for _, t := range best {
 		tools = append(tools, t)
@@ -138,12 +170,17 @@ func collectToolchains(loaded *plan.Loaded) ([]toolchain, []string) {
 }
 
 // renderSetupBlock renders the managed setup steps (6-space indented to sit under
-// the job's `steps:`). The block excludes the marker lines themselves.
-func renderSetupBlock(tools []toolchain) string {
-	header := "      # Toolchains. Regenerate from your modules' `setup:` blocks with\n" +
-		"      # `frodo-ci sync-workflow`; everything up to the closing marker is managed."
+// the job's `steps:`). The block excludes the marker lines themselves. Node also
+// gets a corepack/pnpm step pinned to the repo's resolved pnpm version.
+func renderSetupBlock(tools []toolchain, pnpmVersion string) string {
+	header := "      # Toolchains, resolved from repo metadata (engines/.nvmrc/pom.xml/go.mod)\n" +
+		"      # and your modules' `setup:` blocks. Regenerate with `frodo-ci sync-workflow`;\n" +
+		"      # everything up to the closing marker is managed."
 	if len(tools) == 0 {
-		return header + "\n      # (no module declares a setup: toolchain)"
+		return header + "\n      # (no toolchain detected or declared)"
+	}
+	if pnpmVersion == "" {
+		pnpmVersion = "latest"
 	}
 	var b strings.Builder
 	b.WriteString(header)
@@ -162,8 +199,9 @@ func renderSetupBlock(tools []toolchain) string {
 			fmt.Fprintf(&b, "          %s: %s\n", act.distKey, dist)
 		}
 		fmt.Fprintf(&b, "          %s: \"%s\"", act.versionKey, ver)
-		if act.extra != "" {
-			b.WriteString("\n" + act.extra)
+		if t.tool == "node" {
+			fmt.Fprintf(&b, "\n      - name: Enable pnpm\n        shell: bash\n"+
+				"        run: corepack enable && corepack prepare pnpm@%s --activate", pnpmVersion)
 		}
 	}
 	return b.String()
