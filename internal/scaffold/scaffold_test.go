@@ -3,6 +3,7 @@ package scaffold
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/omarss/frodo-ci/internal/config"
@@ -110,6 +111,24 @@ func TestDetect(t *testing.T) {
 // lists is still detected and an app's dependency on it resolves to an edge --
 // even when referenced by a published-style version rather than workspace:. The
 // npm/yarn `workspaces` root is not itself a module.
+func TestRenderDerivesReviewsFromOwner(t *testing.T) {
+	m := Module{Name: "cards", Type: "spring-service"}
+	m.Owners.Teams = []string{"cards-team"}
+	data, err := Render(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"reviews:", "owners: 1"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("owner module should derive a review rule; missing %q:\n%s", want, data)
+		}
+	}
+	noOwner, _ := Render(Module{Name: "x", Type: "node-app"})
+	if strings.Contains(string(noOwner), "reviews:") {
+		t.Errorf("module without an owner must not get a derived review rule:\n%s", noOwner)
+	}
+}
+
 func TestDetectNodeNestedPackages(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "package.json", `{"name":"monorepo","private":true,"workspaces":["apps/*","clients/*"]}`)

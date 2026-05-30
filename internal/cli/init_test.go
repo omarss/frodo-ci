@@ -37,7 +37,7 @@ func TestInitModule(t *testing.T) {
 		t.Fatal(err)
 	}
 	deps := parseDependsOn([]string{"money:affects=test,build"})
-	if err := app.runInitModule("cards", "spring-service", "services/cards", "cards-team", deps, false); err != nil {
+	if err := app.runInitModule("cards", "spring-service", "services/cards", "cards-team", deps, nil, false); err != nil {
 		t.Fatalf("init-module: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(root, "services/cards/.ci/module.yml"))
@@ -50,11 +50,11 @@ func TestInitModule(t *testing.T) {
 		}
 	}
 	// Re-running without --force must refuse to overwrite.
-	if err := app.runInitModule("cards", "spring-service", "services/cards", "cards-team", nil, false); err == nil {
+	if err := app.runInitModule("cards", "spring-service", "services/cards", "cards-team", nil, nil, false); err == nil {
 		t.Error("expected init-module to refuse overwriting an existing module")
 	}
 	// With --force it overwrites.
-	if err := app.runInitModule("cards", "spring-service", "services/cards", "cards-team", nil, true); err != nil {
+	if err := app.runInitModule("cards", "spring-service", "services/cards", "cards-team", nil, nil, true); err != nil {
 		t.Errorf("init-module --force should overwrite, got %v", err)
 	}
 }
