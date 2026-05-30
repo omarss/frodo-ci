@@ -15,11 +15,12 @@ import (
 
 // Entry records that a stage completed with a given fingerprint.
 type Entry struct {
-	Fingerprint string `json:"fingerprint"`
-	Module      string `json:"module"`
-	Stage       string `json:"stage"`
-	Conclusion  string `json:"conclusion"`
-	SavedAtUnix int64  `json:"saved_at_unix"`
+	Fingerprint string   `json:"fingerprint"`
+	Module      string   `json:"module"`
+	Stage       string   `json:"stage"`
+	Conclusion  string   `json:"conclusion"`
+	SavedAtUnix int64    `json:"saved_at_unix"`
+	Outputs     []string `json:"outputs,omitempty"`
 }
 
 // Cache stores and looks up fingerprint entries.
@@ -31,14 +32,22 @@ type Cache interface {
 	// Save records an entry. Saving is best-effort and must not be required for
 	// correctness.
 	Save(entry Entry) error
+	// SaveOutputs archives the given paths (relative to baseDir) under the
+	// fingerprint so a later hit restores them instead of rebuilding. Best-effort.
+	SaveOutputs(fingerprint, baseDir string, paths []string) error
+	// RestoreOutputs extracts a fingerprint's archived outputs into baseDir,
+	// reporting whether an archive was present.
+	RestoreOutputs(fingerprint, baseDir string) (bool, error)
 }
 
 // Noop is a cache that never hits; used when caching is disabled.
 type Noop struct{}
 
-func (Noop) Has(string) (bool, error)            { return false, nil }
-func (Noop) Restore(string) (Entry, bool, error) { return Entry{}, false, nil }
-func (Noop) Save(Entry) error                    { return nil }
+func (Noop) Has(string) (bool, error)                    { return false, nil }
+func (Noop) Restore(string) (Entry, bool, error)         { return Entry{}, false, nil }
+func (Noop) Save(Entry) error                            { return nil }
+func (Noop) SaveOutputs(string, string, []string) error  { return nil }
+func (Noop) RestoreOutputs(string, string) (bool, error) { return false, nil }
 
 // Open selects a cache backend. When caching is disabled it returns Noop.
 func Open(enabled bool, dir string) (Cache, error) {

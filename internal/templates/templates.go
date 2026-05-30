@@ -38,6 +38,7 @@ type Stage struct {
 	TimeoutMinutes int                         `yaml:"timeout_minutes,omitempty" json:"timeout_minutes,omitempty"`
 	Env            map[string]config.FlexStr   `yaml:"env,omitempty" json:"env,omitempty"`
 	Setup          map[string]config.SetupTool `yaml:"setup,omitempty" json:"setup,omitempty"`
+	Outputs        []string                    `yaml:"outputs,omitempty" json:"outputs,omitempty"`
 	Cache          *config.StageCache          `yaml:"cache,omitempty" json:"cache,omitempty"`
 	Steps          []config.StageStep          `yaml:"steps,omitempty" json:"steps,omitempty"`
 	Security       *config.StageSecurity       `yaml:"security,omitempty" json:"security,omitempty"`
@@ -54,6 +55,7 @@ type EffectiveStage struct {
 	TimeoutMinutes int
 	Env            map[string]config.FlexStr
 	Setup          map[string]config.SetupTool
+	Outputs        []string
 	Cache          *config.StageCache
 	Steps          []config.StageStep
 	Security       *config.StageSecurity
@@ -171,6 +173,7 @@ func resolveStage(group, name string, tpl Stage, mod config.ModuleStage, file *d
 		TimeoutMinutes: tpl.TimeoutMinutes,
 		Env:            cloneEnv(tpl.Env),
 		Setup:          tpl.Setup,
+		Outputs:        tpl.Outputs,
 		Cache:          tpl.Cache,
 		Steps:          tpl.Steps,
 		Security:       tpl.Security,
@@ -197,6 +200,9 @@ func resolveStage(group, name string, tpl Stage, mod config.ModuleStage, file *d
 		}
 		if len(sf.Setup) > 0 {
 			es.Setup = sf.Setup
+		}
+		if len(sf.Outputs) > 0 {
+			es.Outputs = sf.Outputs
 		}
 		if sf.Cache != nil {
 			es.Cache = sf.Cache

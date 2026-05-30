@@ -40,7 +40,8 @@ through **one** standard workflow and **one** required merge check.
 - One required PR check: `Frodo CI / final`
 - Deterministic module/stage planning at startup
 - Decentralized module automation under `.ci`, with central quality profiles
-- Exact fingerprint-based stage skipping (cache never skips review/security/policy)
+- Exact fingerprint-based stage skipping, with build-output restore for dependents
+  (cache never skips review/security/policy)
 - Built-in templates, smart security-scan selection, performance budgets
 - Owner and expert reviewer enforcement, anti-weakening checks
 - Deduplicated Slack notifications for actionable failures
@@ -163,6 +164,26 @@ libraries, that is most of your CI time. The fix is to **model each shared
 library/client as its own Frodo module** (`scaffold` detects them) and let the
 dependency order do the work; the per-module build then stays self-only. The
 generated workflow caches the pnpm/Maven stores so even the install starts warm.
+
+### Build outputs are cached, not rebuilt
+
+A stage can declare the artifacts it produces with `outputs:`. Frodo archives
+them keyed by the stage's fingerprint, and on a hit **restores them instead of
+re-running** — for this module and, in dependency order, for dependents in the
+same run. So an unchanged library doesn't just skip its own build; its `dist/`
+comes back on disk for every dependent that *did* change. The stock templates
+already declare it (`dist/` for Node/TS, `target/` for Maven):
+
+```yaml
+# <module>/.ci/build.yml
+outputs: [dist/]        # archived by fingerprint; restored on a hit
+```
+
+This is what turns "fast when nothing changed" into "fast when one thing
+changed" — the real-world case. Restoring is always keyed by the exact
+fingerprint, so it can only ever skip work, never change a result. (Distinct from
+`cache.paths`, which persists incidental package stores like `~/.m2` at the
+workflow level.)
 
 ### Stage environment
 
