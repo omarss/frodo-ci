@@ -105,6 +105,38 @@ func TestDetect(t *testing.T) {
 	}
 }
 
+// TestDetectNodeNestedPackages covers the JS-graph parity fix: every package.json
+// is walked (like the Maven pom walk), so a nested client that no workspace glob
+// lists is still detected and an app's dependency on it resolves to an edge --
+// even when referenced by a published-style version rather than workspace:. The
+// npm/yarn `workspaces` root is not itself a module.
+func TestDetectNodeNestedPackages(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "package.json", `{"name":"monorepo","private":true,"workspaces":["apps/*","clients/*"]}`)
+	write(t, root, "apps/api/package.json", `{"name":"@acme/api","scripts":{"start":"node ."},"dependencies":{"@acme/api-client":"1.4.0"}}`)
+	write(t, root, "clients/api-client/package.json", `{"name":"@acme/api-client","version":"1.4.0"}`)
+
+	cfg := &config.RootConfig{}
+	cfg.ApplyDefaults()
+	res, err := Detect(root, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if find(res, ".") != nil || find(res, "") != nil {
+		t.Error("the workspaces root must not be proposed as a module")
+	}
+	api := find(res, "apps/api")
+	if api == nil {
+		t.Fatalf("apps/api not detected: %+v", res.Modules)
+	}
+	if len(api.DependsOn) != 1 || api.DependsOn[0].Module != "api-client" {
+		t.Errorf("api.depends_on = %+v, want [api-client]", api.DependsOn)
+	}
+	if c := find(res, "clients/api-client"); c == nil || c.Type != "node-library" {
+		t.Errorf("client = %+v, want node-library (nested, no workspace glob)", c)
+	}
+}
+
 func TestRenderIsValid(t *testing.T) {
 	data, err := Render(Module{
 		Name: "cards", Type: "spring-service",
