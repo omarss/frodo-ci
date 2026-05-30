@@ -37,22 +37,7 @@ type Inputs struct {
 // bots (when ignored), and stale reviews (when require-after-latest-commit) do
 // not count.
 func Evaluate(req Requirement, in Inputs) (bool, []string) {
-	approvers := map[string]bool{}
-	for _, r := range in.Reviews {
-		if !r.Approved {
-			continue
-		}
-		if in.IgnoreAuthor && r.User == in.Author {
-			continue
-		}
-		if in.IgnoreBots && r.IsBot {
-			continue
-		}
-		if in.RequireAfterLatestCommit && r.Stale {
-			continue
-		}
-		approvers[r.User] = true
-	}
+	approvers := approverSet(in)
 
 	var missing []string
 
@@ -90,6 +75,69 @@ func Evaluate(req Requirement, in Inputs) (bool, []string) {
 	}
 
 	return len(missing) == 0, missing
+}
+
+// approverSet is the set of logins whose approval counts, applying the same
+// author/bot/staleness filters as Evaluate.
+func approverSet(in Inputs) map[string]bool {
+	approvers := map[string]bool{}
+	for _, r := range in.Reviews {
+		if !r.Approved {
+			continue
+		}
+		if in.IgnoreAuthor && r.User == in.Author {
+			continue
+		}
+		if in.IgnoreBots && r.IsBot {
+			continue
+		}
+		if in.RequireAfterLatestCommit && r.Stale {
+			continue
+		}
+		approvers[r.User] = true
+	}
+	return approvers
+}
+
+// Suggestion identifies which parts of a requirement are still unmet, so callers
+// can request exactly the right reviewers and not re-ping satisfied ones.
+type Suggestion struct {
+	OwnersShort  bool     // owner approvals are still needed
+	ExpertNeeded bool     // expert approval is required and not yet given
+	ExpertLogin  string   // the resolved expert ("" if none could be resolved)
+	TeamsShort   []string // team slugs still short of their required approvals
+}
+
+// Suggest reports the unmet parts of a requirement, under the same rules as
+// Evaluate, so callers know whom to request as reviewers.
+func Suggest(req Requirement, in Inputs) Suggestion {
+	approvers := approverSet(in)
+	var s Suggestion
+	if req.Owners > 0 {
+		count := 0
+		for u := range approvers {
+			if in.Owners[u] {
+				count++
+			}
+		}
+		s.OwnersShort = count < req.Owners
+	}
+	if req.Expert > 0 {
+		s.ExpertLogin = in.Expert
+		s.ExpertNeeded = in.Expert == "" || !approvers[in.Expert]
+	}
+	for _, team := range sortedKeys(req.Teams) {
+		count := 0
+		for _, m := range in.TeamMembers[team] {
+			if approvers[m] {
+				count++
+			}
+		}
+		if count < req.Teams[team] {
+			s.TeamsShort = append(s.TeamsShort, team)
+		}
+	}
+	return s
 }
 
 func sortedKeys(m map[string]int) []string {

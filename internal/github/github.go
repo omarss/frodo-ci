@@ -139,6 +139,19 @@ func (c *Client) ListReviews(ctx context.Context) ([]Review, error) {
 	return out, nil
 }
 
+// RequestReviewers requests the given users and team slugs as reviewers on the
+// PR. GitHub de-duplicates entries already requested or reviewed, so it is safe
+// to call on every run; an unknown team/user yields an API error the caller can
+// treat as best-effort.
+func (c *Client) RequestReviewers(ctx context.Context, users, teams []string) error {
+	if len(users) == 0 && len(teams) == 0 {
+		return nil
+	}
+	_, _, err := c.api.PullRequests.RequestReviewers(ctx, c.ctx.Owner, c.ctx.Repo, c.ctx.PRNumber,
+		gh.ReviewersRequest{Reviewers: users, TeamReviewers: teams})
+	return err
+}
+
 // Permission returns a user's permission level (admin, write, read, none).
 func (c *Client) Permission(ctx context.Context, user string) (string, error) {
 	lvl, _, err := c.api.Repositories.GetPermissionLevel(ctx, c.ctx.Owner, c.ctx.Repo, user)
