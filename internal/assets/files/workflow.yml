@@ -44,6 +44,9 @@ jobs:
     name: final
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # >>> frodo-ci:env
+    # Job-level env from root config `workflow.env:`; managed by `frodo-ci sync-workflow`.
+    # <<< frodo-ci:env
     steps:
       # Third-party actions are pinned to a full commit SHA (supply-chain
       # hardening); the trailing comment is the human-readable version.

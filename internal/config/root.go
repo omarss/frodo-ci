@@ -17,7 +17,16 @@ type RootConfig struct {
 	Lint           RootLint        `yaml:"lint,omitempty" json:"lint,omitempty"`
 	Performance    RootPerformance `yaml:"performance,omitempty" json:"performance,omitempty"`
 	Slack          SlackConfig     `yaml:"slack,omitempty" json:"slack,omitempty"`
+	Workflow       WorkflowConfig  `yaml:"workflow,omitempty" json:"workflow,omitempty"`
 	ProtectedFiles []ProtectedFile `yaml:"protected_files,omitempty" json:"protected_files,omitempty"`
+}
+
+// WorkflowConfig declares settings the generated workflow provisions in managed,
+// drift-checked blocks (e.g. job-level environment, resource hints).
+type WorkflowConfig struct {
+	// Env is job-level environment for the generated workflow's job (e.g.
+	// NODE_OPTIONS=--max-old-space-size=4096), emitted by `frodo-ci sync-workflow`.
+	Env map[string]FlexStr `yaml:"env,omitempty" json:"env,omitempty"`
 }
 
 // ScanConfig bounds which paths Frodo CI considers when discovering modules.

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/omarss/frodo-ci/internal/config"
 	"github.com/omarss/frodo-ci/internal/plan"
 	"github.com/spf13/cobra"
 )
@@ -17,6 +18,8 @@ import (
 const (
 	setupMarkerStart = "# >>> frodo-ci:setup"
 	setupMarkerEnd   = "# <<< frodo-ci:setup"
+	envMarkerStart   = "# >>> frodo-ci:env"
+	envMarkerEnd     = "# <<< frodo-ci:env"
 	workflowRelPath  = ".github/workflows/frodo-ci.yml"
 )
 
@@ -119,6 +122,17 @@ func (a *App) renderManagedWorkflow() (path, original, updated string, unknown [
 		return path, "", "", unk, fmt.Errorf("read %s (run `frodo-ci init` first?): %w", workflowRelPath, err)
 	}
 	upd, err := replaceSetupBlock(string(data), renderSetupBlock(tools, detected.pnpm))
+	if err != nil {
+		return path, string(data), "", unk, err
+	}
+	// The env block is optional: older workflows may lack its markers, in which
+	// case job-level env is simply not managed (no error).
+	if strings.Contains(upd, envMarkerStart) {
+		upd, err = replaceEnvBlock(upd, renderEnvBlock(loaded.Root.Workflow.Env))
+		if err != nil {
+			return path, string(data), "", unk, err
+		}
+	}
 	return path, string(data), upd, unk, err
 }
 
@@ -226,31 +240,59 @@ func renderSetupBlock(tools []toolchain, pnpmVersion string) string {
 	return b.String()
 }
 
-// replaceSetupBlock swaps the lines between the setup markers, keeping the marker
-// lines in place.
 func replaceSetupBlock(workflow, block string) (string, error) {
+	return replaceMarkedBlock(workflow, setupMarkerStart, setupMarkerEnd, block)
+}
+
+func replaceEnvBlock(workflow, block string) (string, error) {
+	return replaceMarkedBlock(workflow, envMarkerStart, envMarkerEnd, block)
+}
+
+// replaceMarkedBlock swaps the lines between a marker pair, keeping the marker
+// lines in place.
+func replaceMarkedBlock(workflow, startMarker, endMarker, block string) (string, error) {
 	lines := strings.Split(workflow, "\n")
 	start, end := -1, -1
 	for i, l := range lines {
 		switch strings.TrimSpace(l) {
-		case setupMarkerStart:
+		case startMarker:
 			if start == -1 {
 				start = i
 			}
-		case setupMarkerEnd:
+		case endMarker:
 			if start != -1 && end == -1 {
 				end = i
 			}
 		}
 	}
 	if start == -1 || end == -1 || end < start {
-		return "", fmt.Errorf("setup markers not found in %s — re-run `frodo-ci init` to refresh it", workflowRelPath)
+		return "", fmt.Errorf("markers %q/%q not found in %s — re-run `frodo-ci init` to refresh it", startMarker, endMarker, workflowRelPath)
 	}
 	out := make([]string, 0, len(lines))
 	out = append(out, lines[:start+1]...)
 	out = append(out, strings.Split(block, "\n")...)
 	out = append(out, lines[end:]...)
 	return strings.Join(out, "\n"), nil
+}
+
+// renderEnvBlock renders the managed job-level env (4-space indented to sit under
+// the job), from root config `workflow.env:`. Empty config leaves an inert
+// comment so the block round-trips.
+func renderEnvBlock(env map[string]config.FlexStr) string {
+	if len(env) == 0 {
+		return "    # Job-level env from root config `workflow.env:`; managed by `frodo-ci sync-workflow`."
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString("    env:")
+	for _, k := range keys {
+		fmt.Fprintf(&b, "\n      %s: \"%s\"", k, env[k].String())
+	}
+	return b.String()
 }
 
 // versionLess reports whether version a is lower than b, comparing dotted numeric
