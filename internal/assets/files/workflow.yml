@@ -109,6 +109,31 @@ jobs:
             frodo-ci-toolchains-${{ github.base_ref }}-
             frodo-ci-toolchains-
 
+      # Install the scanners Frodo's scan stage enforces. The gate is not
+      # bypassable: a triggered scan whose tool is missing FAILS the run, so the
+      # standard tools are provisioned here. Pin versions for full reproducibility,
+      # and drop any tool your repo does not use.
+      - name: Install security tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          # trivy — dependency CVEs, licenses, containers, full scan
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sudo sh -s -- -b /usr/local/bin
+          # semgrep — SAST (pipx is preinstalled on GitHub runners)
+          pipx install semgrep
+          # gitleaks — secrets
+          gl=$(curl -sfL https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+            | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+          curl -sfL "https://github.com/gitleaks/gitleaks/releases/download/${gl}/gitleaks_${gl#v}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          # hadolint — Dockerfile lint
+          hl=$(curl -sfL https://api.github.com/repos/hadolint/hadolint/releases/latest \
+            | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+          sudo curl -sfL -o /usr/local/bin/hadolint \
+            "https://github.com/hadolint/hadolint/releases/download/${hl}/hadolint-Linux-x86_64"
+          sudo chmod +x /usr/local/bin/hadolint
+
       - name: Run Frodo CI
         uses: omarss/frodo-ci@v1
         with:

@@ -11,13 +11,11 @@ through **one** standard workflow and **one** required merge check.
 > [!WARNING]
 > **Status: v1.0.0.** The deterministic core — planning, config validation,
 > semantic linting, fingerprinting, and the execution engine — is implemented
-> and unit-tested (19 packages, `make test` green). The GitHub check-run,
+> and unit-tested (22 packages, `make test` green). The GitHub check-run,
 > review/expert, security-tool, and Slack integrations are implemented against
 > their real clients but have **not yet been exercised in a live GitHub Actions
-> run**, and security scanning currently *selects* the scans to run without
-> fully parsing/enforcing each tool's findings. **Treat the integration layers
-> as beta — don't rely on it as your only merge gate yet.** See
-> [Known limitations](#known-limitations).
+> run**. **Treat the integration layers as beta — don't rely on it as your only
+> merge gate yet.** See [Known limitations](#known-limitations).
 
 ## Contents
 
@@ -278,9 +276,11 @@ Be aware of these before adopting it to gate merges:
 - **Not yet run end-to-end in GitHub Actions.** Dynamic check-run creation, the
   `Frodo CI / final` gating, review/expert enforcement, and Slack delivery are
   implemented (`go-github`, `slack-go`) but unproven against a live run.
-- **Security scanning decides, it does not fully enforce.** It correctly selects
-  which scans to run per change type and invokes a tool if installed, but does
-  not yet parse each tool's findings (SARIF) and block on them.
+- **Security scanning enforces.** It selects the scans per change type, runs the
+  tool (semgrep/gitleaks/trivy/hadolint), parses SARIF, and **blocks** on findings
+  per the module's profile (`fail_on_new_critical`, secrets, blocking rulesets),
+  honoring time-bounded suppressions. The generated workflow installs the tools;
+  a triggered scan whose tool is missing fails (non-bypassable).
 - **No in-process toolchain provisioning.** `run` executes your steps assuming
   the tools exist. The generated workflow scaffolds `setup-java`/`setup-node`
   for the stock templates, but installing toolchains is the workflow's job —
