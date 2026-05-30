@@ -80,7 +80,7 @@ func TestSyncWorkflowFromSetup(t *testing.T) {
 	mustWrite(t, filepath.Join(root, "tool/src/x.txt"), "x\n")
 
 	app := &App{RepoRoot: root, Out: io.Discard}
-	if err := app.runSyncWorkflow(false); err != nil {
+	if err := app.runSyncWorkflow(false, ""); err != nil {
 		t.Fatalf("sync-workflow: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(root, ".github/workflows/frodo-ci.yml"))
@@ -98,5 +98,24 @@ func TestSyncWorkflowFromSetup(t *testing.T) {
 	}
 	if strings.Contains(got, `java-version: "21"`) {
 		t.Errorf("stale java 21 should have been replaced:\n%s", got)
+	}
+}
+
+func TestReplaceActionRef(t *testing.T) {
+	wf := "      - name: Run Frodo CI\n        uses: omarss/frodo-ci@v1\n        with:\n          command: run\n"
+	out := replaceActionRef(wf, "omarss/frodo-ci@v1.10.0")
+	if !strings.Contains(out, "uses: omarss/frodo-ci@v1.10.0") {
+		t.Errorf("ref not bumped:\n%s", out)
+	}
+	if strings.Contains(out, "frodo-ci@v1\n") {
+		t.Error("old ref should be gone")
+	}
+	if replaceActionRef(wf, "") != wf {
+		t.Error("empty ref must be a no-op")
+	}
+	// must not touch setup-* actions
+	other := "        uses: actions/setup-node@abc # v6\n"
+	if replaceActionRef(other, "omarss/frodo-ci@v2") != other {
+		t.Error("non-frodo actions must be untouched")
 	}
 }
