@@ -107,7 +107,8 @@ func TestBuildCommentReviewsBlock(t *testing.T) {
 			{Module: "internal-api", Stage: "test", Status: "success"},
 		},
 		Reviews: []ReviewReport{
-			{Module: "internal-api", OK: false, Missing: []string{"owner approval (1 of 1)", "expert approval"}},
+			{Module: "internal-api", OK: false, Missing: []string{"owner approval (1 of 1)", "expert approval"},
+				Reviewers: []string{"@platform", "@charlie"}},
 			{Module: "common", OK: true},
 		},
 	}
@@ -116,6 +117,7 @@ func TestBuildCommentReviewsBlock(t *testing.T) {
 		"1 review requirement(s) not met",
 		"🔒 Review required (1)",
 		"`internal-api` — owner approval (1 of 1); expert approval",
+		"should be reviewed by @platform, @charlie",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q\n---\n%s", want, out)

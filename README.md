@@ -258,7 +258,10 @@ Frodo CI runs as a single GitHub job (`final`) that orchestrates everything
 - on a pull request the gate also enforces **reviews**: `run` evaluates each
   module's owner/expert/team approval requirements and fails the final check when
   they are unmet (fail-closed) — so the one required check covers reviews too,
-  with no separate workflow step
+  with no separate workflow step. It also **requests the resolved reviewers**
+  (owner teams + the expert) on the PR and names them in the comment
+  (`should be reviewed by @platform, @charlie`), so an unmet review turns into an
+  actionable request, not a dead end
 
 **Never use `always()`** in the workflow or steps — cleanup, summaries, check
 finalization, and reporting all happen in normal control flow.

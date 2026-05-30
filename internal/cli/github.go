@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -117,12 +118,15 @@ type ReviewOutcome struct {
 	Modules   []ModuleReview
 }
 
-// ModuleReview is one module's review-gate status.
+// ModuleReview is one module's review-gate status, including the reviewers that
+// can satisfy it (owner teams, the resolved expert, required teams).
 type ModuleReview struct {
-	Module  string
-	OK      bool
-	Expert  string
-	Missing []string
+	Module       string
+	OK           bool
+	Expert       string
+	Missing      []string
+	RequestTeams []string // team slugs to request as reviewers
+	RequestUsers []string // user logins to request (the expert)
 }
 
 // gateReviews evaluates review requirements when running inside a pull request,
@@ -170,15 +174,77 @@ func (a *App) evaluateReviews(ctx context.Context, loaded *plan.Loaded, gh githu
 			IgnoreBots:               loaded.Root.Reviews.IgnoreBotApproval,
 			RequireAfterLatestCommit: loaded.Root.Reviews.RequireApprovalAfterLatestCommit,
 		}
-		satisfied, missing := reviews.Evaluate(requirementOf(rule.Require), in)
+		req := requirementOf(rule.Require)
+		satisfied, missing := reviews.Evaluate(req, in)
+		mr := ModuleReview{Module: m.Name, OK: satisfied, Expert: expert, Missing: missing}
 		if !satisfied {
 			out.Satisfied = false
+			// Resolve who can unblock it: owner teams when owner approvals are
+			// short, required teams that are short, and the expert when needed.
+			sug := reviews.Suggest(req, in)
+			if sug.OwnersShort {
+				mr.RequestTeams = append(mr.RequestTeams, m.Config.Owners.Teams...)
+			}
+			mr.RequestTeams = append(mr.RequestTeams, sug.TeamsShort...)
+			if sug.ExpertNeeded && sug.ExpertLogin != "" && sug.ExpertLogin != gh.PRAuthor {
+				mr.RequestUsers = append(mr.RequestUsers, sug.ExpertLogin)
+			}
 		}
-		out.Modules = append(out.Modules, ModuleReview{
-			Module: m.Name, OK: satisfied, Expert: expert, Missing: missing,
-		})
+		out.Modules = append(out.Modules, mr)
 	}
 	return out, nil
+}
+
+// requestReviewers asks GitHub to add the resolved owner teams and expert as
+// reviewers on the PR, turning an unmet review into actual review requests. It
+// is best-effort: a failure (e.g. a team that does not exist) is logged, not
+// fatal -- the gate already blocks the merge. Returns the handles it requested.
+func (a *App) requestReviewers(ctx context.Context, outcome ReviewOutcome) []string {
+	if !outcome.Evaluated || outcome.Satisfied {
+		return nil
+	}
+	teamSet, userSet := map[string]bool{}, map[string]bool{}
+	for _, m := range outcome.Modules {
+		for _, t := range m.RequestTeams {
+			if t != "" {
+				teamSet[t] = true
+			}
+		}
+		for _, u := range m.RequestUsers {
+			if u != "" {
+				userSet[u] = true
+			}
+		}
+	}
+	teams, users := sortedSet(teamSet), sortedSet(userSet)
+	if len(teams) == 0 && len(users) == 0 {
+		return nil
+	}
+	gh := github.FromEnv()
+	if !gh.Enabled() || !gh.HasPR() {
+		return nil
+	}
+	if err := github.NewClient(ctx, gh).RequestReviewers(ctx, users, teams); err != nil {
+		a.Log.Warn().Err(err).Msg("could not request reviewers (best-effort)")
+		return nil
+	}
+	var requested []string
+	for _, t := range teams {
+		requested = append(requested, "@"+t)
+	}
+	for _, u := range users {
+		requested = append(requested, "@"+u)
+	}
+	return requested
+}
+
+func sortedSet(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // printReviewOutcome renders the standalone `review` command's output.

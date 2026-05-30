@@ -86,6 +86,8 @@ func (a *App) runExecute(ctx context.Context, group string) error {
 		a.Log.Warn().Err(reviewErr).Msg("could not evaluate review requirements; failing closed")
 	}
 	reviewsBlock := reviewErr != nil || (reviewOutcome.Evaluated && !reviewOutcome.Satisfied)
+	// Turn an unmet review into actual review requests on the PR (best-effort).
+	a.requestReviewers(ctx, reviewOutcome)
 
 	budgetExceeded := a.reportRun(loaded, p, result)
 	a.publishReport(ctx, loaded, p, result, reviewOutcome)

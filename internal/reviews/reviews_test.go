@@ -80,6 +80,30 @@ func TestEvaluateMissingExpertAndTeam(t *testing.T) {
 	}
 }
 
+func TestSuggestUnmetParts(t *testing.T) {
+	req := Requirement{Owners: 1, Expert: 1, Teams: map[string]int{"security-team": 1}}
+	in := Inputs{
+		Author:      "alice",
+		Expert:      "ahmed",
+		Owners:      map[string]bool{"owner1": true},
+		TeamMembers: map[string][]string{"security-team": {"sec1", "sec2"}},
+		Reviews: []ReviewState{
+			{User: "owner1", Approved: true}, // owner requirement satisfied
+			{User: "ahmed", Approved: false}, // expert did not approve
+		},
+	}
+	s := Suggest(req, in)
+	if s.OwnersShort {
+		t.Error("owner requirement is satisfied; OwnersShort should be false")
+	}
+	if !s.ExpertNeeded || s.ExpertLogin != "ahmed" {
+		t.Errorf("expert still needed; got %+v", s)
+	}
+	if len(s.TeamsShort) != 1 || s.TeamsShort[0] != "security-team" {
+		t.Errorf("security-team should be short; got %v", s.TeamsShort)
+	}
+}
+
 func TestEvaluateStaleApprovalIgnored(t *testing.T) {
 	req := Requirement{Owners: 1}
 	in := Inputs{

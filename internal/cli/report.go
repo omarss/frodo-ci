@@ -75,8 +75,15 @@ func (a *App) buildReportInput(loaded *plan.Loaded, p *plan.Plan, res *runner.Re
 	}
 	var reviewReports []report.ReviewReport
 	for _, m := range review.Modules {
+		var reviewers []string
+		for _, t := range m.RequestTeams {
+			reviewers = append(reviewers, "@"+t)
+		}
+		for _, u := range m.RequestUsers {
+			reviewers = append(reviewers, "@"+u)
+		}
 		reviewReports = append(reviewReports, report.ReviewReport{
-			Module: m.Module, OK: m.OK, Missing: m.Missing,
+			Module: m.Module, OK: m.OK, Missing: m.Missing, Reviewers: reviewers,
 		})
 	}
 	return report.Input{SHA: github.FromEnv().SHA, Stages: stages, Reviews: reviewReports}
