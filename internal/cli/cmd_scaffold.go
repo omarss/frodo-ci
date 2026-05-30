@@ -45,6 +45,9 @@ func (a *App) runInit(force bool, actionRef string) error {
 	for _, f := range res.Skipped {
 		fmt.Fprintf(a.Out, "  exists   %s (use --force to overwrite)\n", f)
 	}
+	// Reflect the repo's real toolchains (engines/.nvmrc/pom.xml/go.mod) in the
+	// generated workflow so the first run uses the right versions, not defaults.
+	a.syncWorkflowAfterInit()
 	fmt.Fprintf(a.Out, "\nFrodo CI initialized: %d written, %d skipped.\n", len(res.Written), len(res.Skipped))
 	fmt.Fprintln(a.Out, "Next: add modules with `frodo-ci init-module`, then require only")
 	fmt.Fprintln(a.Out, "the \"Frodo CI / final\" status check in branch protection.")

@@ -207,7 +207,7 @@ Run any command with `--help` for details. Global flags apply to all of them.
 | `init` | Scaffold Frodo CI into the repository (`--action-ref` for forks; `--force`) |
 | `init-module --name --type --path --owner` | Scaffold a module's `.ci/module.yml` (`--depends-on m[:affects=a,b]` repeatable; `--force`) |
 | `scaffold` | Detect modules from build metadata (Maven/pnpm/go/Docker/IaC), resolve intra-repo dependencies into `depends_on` edges, and propose `.ci/module.yml` files (`--write` to apply, `--owner` fallback) |
-| `sync-workflow` | Regenerate the workflow's toolchain setup from modules' `setup:` blocks, using SHA-pinned `setup-*` actions (`--check` to verify in CI) |
+| `sync-workflow` | Regenerate the workflow's toolchain setup from repo metadata (`engines.node`/`.nvmrc`/`pom.xml`/`go.mod`/`packageManager`) and modules' `setup:` blocks, using SHA-pinned `setup-*` actions (`--check` to verify in CI) |
 | `validate-config` | Validate config against the JSON Schemas |
 | `lint-config` | Semantic linting (cycles, broad inputs, weakening, ...) |
 | `plan` | Calculate and print the execution plan |
@@ -290,12 +290,15 @@ Be aware of these before adopting it to gate merges:
   per the module's profile (`fail_on_new_critical`, secrets, blocking rulesets),
   honoring time-bounded suppressions. The generated workflow installs the tools;
   a triggered scan whose tool is missing fails (non-bypassable).
-- **Toolchains are provisioned by the workflow, generated from `setup:`.** `run`
-  executes your steps assuming the tools exist; the workflow provisions them via
-  maintained, SHA-pinned `setup-*` actions. Run `frodo-ci sync-workflow` to
-  regenerate that section from the union of your modules' `setup:` blocks (it
-  picks the highest version per tool) — so adding a module with `setup: {go: 1.25}`
-  needs no hand-editing. `--check` fails CI if the workflow drifts from `setup:`.
+- **Toolchains are provisioned by the workflow, resolved from repo metadata.**
+  `run` executes your steps assuming the tools exist; the workflow provisions them
+  via maintained, SHA-pinned `setup-*` actions. `frodo-ci init` and
+  `frodo-ci sync-workflow` resolve the **versions from the repo itself** —
+  `engines.node` / `.nvmrc` / `.node-version`, `packageManager` (pnpm),
+  `.java-version` / `pom.xml` (`maven.compiler.release`), `go.mod` — overriding
+  template defaults, and include any toolchain the repo clearly uses. So a repo on
+  Node 24 + pnpm 10.34.1 gets exactly that, no hand-editing. `--check` fails CI if
+  the workflow drifts.
 - **GitHub/Slack features need credentials** (`GITHUB_TOKEN`, `SLACK_WEBHOOK_URL`)
   and a PR context to do anything; locally they degrade gracefully.
 
