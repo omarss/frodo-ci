@@ -38,6 +38,11 @@ type StageResult struct {
 	Duration time.Duration `json:"duration"`
 	Steps    []StepResult  `json:"steps,omitempty"`
 	Note     string        `json:"note,omitempty"`
+	// Cached is true when the stage was a fingerprint hit (skipped, not executed).
+	Cached bool `json:"cached,omitempty"`
+	// RestoredOutputs is true when a cache hit restored the stage's build outputs
+	// to disk (so dependents reuse them instead of rebuilding).
+	RestoredOutputs bool `json:"restored_outputs,omitempty"`
 	// Env is the resolved FRODO_* (and stage) environment the steps ran with, so
 	// failure reporting can produce a literally-runnable reproduce command.
 	Env map[string]string `json:"env,omitempty"`
@@ -260,6 +265,24 @@ func (r *Runner) runStage(ctx context.Context, p *plan.Plan, s *plan.StagePlan, 
 		return sr
 	}
 
+	// A cache hit: don't execute. Restore the stage's declared outputs (if any)
+	// so dependents that do run reuse them instead of rebuilding, then record the
+	// stage as skipped.
+	if s.Skipped {
+		sr.Status = StatusSkipped
+		sr.Cached = true
+		sr.Note = "unchanged (cache hit)"
+		if len(eff.Outputs) > 0 && r.opts.Cache != nil {
+			moduleDir := filepath.Join(r.loaded.RepoRoot, filepath.FromSlash(m.Dir))
+			if restored, err := r.opts.Cache.RestoreOutputs(s.Fingerprint, moduleDir); err == nil && restored {
+				sr.RestoredOutputs = true
+				sr.Note = "unchanged — restored cached outputs"
+			}
+		}
+		sr.Duration = time.Since(start)
+		return sr
+	}
+
 	timeout := r.opts.StageDefaultTimeout
 	if eff.TimeoutMinutes > 0 {
 		timeout = time.Duration(eff.TimeoutMinutes) * time.Minute
@@ -317,7 +340,14 @@ func (r *Runner) runStage(ctx context.Context, p *plan.Plan, s *plan.StagePlan, 
 		_ = r.opts.Cache.Save(cache.Entry{
 			Fingerprint: s.Fingerprint, Module: s.Module, Stage: s.Stage,
 			Conclusion: string(StatusSuccess), SavedAtUnix: time.Now().Unix(),
+			Outputs: eff.Outputs,
 		})
+		// Archive the build artifacts keyed by fingerprint so a later hit -- here
+		// or on another runner -- restores them instead of rebuilding.
+		if len(eff.Outputs) > 0 {
+			moduleDir := filepath.Join(r.loaded.RepoRoot, filepath.FromSlash(m.Dir))
+			_ = r.opts.Cache.SaveOutputs(s.Fingerprint, moduleDir, eff.Outputs)
+		}
 	}
 	return sr
 }
@@ -330,9 +360,9 @@ func (r *Runner) scope(p *plan.Plan, group string) (map[string][]*plan.StagePlan
 	for _, mp := range p.Modules {
 		var stages []*plan.StagePlan
 		for _, s := range mp.Stages {
-			if s.Skipped {
-				continue
-			}
+			// Skipped (cache-hit) stages are kept, not dropped: the runner records
+			// them and restores their cached outputs in dependency order, so an
+			// unchanged module's artifacts are on disk for dependents that do run.
 			if group != "" && group != "all" && s.Group != group {
 				continue
 			}

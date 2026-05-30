@@ -30,6 +30,7 @@ ci:
     when: [pom.xml, src/main/**]
     setup:
       java: {distribution: liberica, version: 25}
+    outputs: [target/]
     cache:
       paths: [~/.m2/repository]
     steps:

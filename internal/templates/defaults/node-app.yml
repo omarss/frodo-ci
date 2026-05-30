@@ -34,6 +34,7 @@ ci:
     when: [package.json, src/**]
     setup:
       node: {version: 22}
+    outputs: [dist/]
     cache:
       paths: [~/.local/share/pnpm/store]
     steps:

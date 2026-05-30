@@ -9,8 +9,13 @@ type StageFile struct {
 	TimeoutMinutes int                  `yaml:"timeout_minutes,omitempty" json:"timeout_minutes,omitempty"`
 	Env            map[string]FlexStr   `yaml:"env,omitempty" json:"env,omitempty"`
 	Setup          map[string]SetupTool `yaml:"setup,omitempty" json:"setup,omitempty"`
-	Cache          *StageCache          `yaml:"cache,omitempty" json:"cache,omitempty"`
-	Steps          []StageStep          `yaml:"steps,omitempty" json:"steps,omitempty"`
+	// Outputs are build artifacts (e.g. dist/, target/) this stage produces. They
+	// are archived keyed by the stage fingerprint and restored on a hit -- for
+	// this module and for dependents in the same run -- so unchanged work is
+	// restored instead of rebuilt.
+	Outputs []string    `yaml:"outputs,omitempty" json:"outputs,omitempty"`
+	Cache   *StageCache `yaml:"cache,omitempty" json:"cache,omitempty"`
+	Steps   []StageStep `yaml:"steps,omitempty" json:"steps,omitempty"`
 }
 
 // SetupTool requests a toolchain (e.g. java, node, go) for a stage. Versions
@@ -20,8 +25,10 @@ type SetupTool struct {
 	Version      FlexStr `yaml:"version,omitempty" json:"version,omitempty"`
 }
 
-// StageCache declares directories to cache for a stage. Caching is keyed by the
-// stage fingerprint, so it never weakens correctness -- only speed.
+// StageCache declares incidental package-store directories (e.g. the pnpm or
+// Maven store) that the CI workflow persists across runs. For build artifacts
+// that dependent modules consume, use the stage's `outputs:` instead -- those
+// are archived and restored keyed by the stage fingerprint.
 type StageCache struct {
 	Paths []string `yaml:"paths,omitempty" json:"paths,omitempty"`
 	Key   string   `yaml:"key,omitempty" json:"key,omitempty"`
