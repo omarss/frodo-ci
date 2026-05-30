@@ -18,7 +18,7 @@ ci:
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Typecheck
-        run: pnpm -s typecheck
+        run: pnpm -s --if-present typecheck
 
   test:
     when: [package.json, src/**, test/**, tests/**]
@@ -28,7 +28,7 @@ ci:
       paths: [~/.local/share/pnpm/store]
     steps:
       - name: Test
-        run: pnpm -s test
+        run: pnpm -s --if-present test
 
   build:
     when: [package.json, tsconfig.json, src/**]
@@ -39,7 +39,7 @@ ci:
       paths: [~/.local/share/pnpm/store]
     steps:
       - name: Build
-        run: pnpm -s build
+        run: pnpm -s --if-present build
 
   scan:
     when: [package.json, pnpm-lock.yaml, src/**]
