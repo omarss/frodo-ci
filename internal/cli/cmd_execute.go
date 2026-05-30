@@ -77,8 +77,18 @@ func (a *App) runExecute(ctx context.Context, group string) error {
 	opts.Scanner = a.buildScanner(loaded, p)
 	result := runner.New(loaded, opts).Run(ctx, p, group)
 
+	// Reviews are part of the same gate: a PR that has not met its owner/expert/
+	// review requirements fails even when every stage is green, so the single
+	// "Frodo CI / final" check enforces them (fail-closed — an API error blocks
+	// rather than silently passing).
+	reviewOutcome, reviewErr := a.gateReviews(ctx, loaded)
+	if reviewErr != nil {
+		a.Log.Warn().Err(reviewErr).Msg("could not evaluate review requirements; failing closed")
+	}
+	reviewsBlock := reviewErr != nil || (reviewOutcome.Evaluated && !reviewOutcome.Satisfied)
+
 	budgetExceeded := a.reportRun(loaded, p, result)
-	a.publishReport(ctx, loaded, p, result)
+	a.publishReport(ctx, loaded, p, result, reviewOutcome)
 
 	if a.JSON {
 		if err := writeJSON(a.Out, result); err != nil {
@@ -89,8 +99,11 @@ func (a *App) runExecute(ctx context.Context, group string) error {
 		if budgetExceeded {
 			fmt.Fprintln(a.Out, "performance budget exceeded")
 		}
+		if reviewsBlock {
+			fmt.Fprintln(a.Out, "review requirements not met")
+		}
 	}
-	if !result.Success || budgetExceeded {
+	if !result.Success || budgetExceeded || reviewsBlock {
 		return ErrExitQuiet
 	}
 	return nil

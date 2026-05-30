@@ -98,6 +98,34 @@ func TestBuildCommentSeparatesBlockedFromFailed(t *testing.T) {
 	}
 }
 
+func TestBuildCommentReviewsBlock(t *testing.T) {
+	// Every stage is green, but a module's review requirement is unmet — the
+	// single gate must still fail, prominently.
+	in := Input{
+		Stages: []StageReport{
+			{Module: "internal-api", Stage: "validate", Status: "success"},
+			{Module: "internal-api", Stage: "test", Status: "success"},
+		},
+		Reviews: []ReviewReport{
+			{Module: "internal-api", OK: false, Missing: []string{"owner approval (1 of 1)", "expert approval"}},
+			{Module: "common", OK: true},
+		},
+	}
+	out := BuildComment(in)
+	for _, want := range []string{
+		"1 review requirement(s) not met",
+		"🔒 Review required (1)",
+		"`internal-api` — owner approval (1 of 1); expert approval",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q\n---\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "all 2 check(s) passed") {
+		t.Error("must not claim all passed when a review requirement is unmet")
+	}
+}
+
 func TestCacheSummaryLine(t *testing.T) {
 	in := Input{Stages: []StageReport{
 		{Module: "a", Stage: "validate", Status: "success", Duration: 2 * time.Second},

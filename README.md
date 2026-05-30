@@ -255,6 +255,10 @@ Frodo CI runs as a single GitHub job (`final`) that orchestrates everything
   `stop_expensive_stages_after_validation_failure`
 - the cache may skip `validate`/`test`/`build`/`package` on an exact fingerprint
   match, but **never** `scan` (security), CD stages, reviews, or policy checks
+- on a pull request the gate also enforces **reviews**: `run` evaluates each
+  module's owner/expert/team approval requirements and fails the final check when
+  they are unmet (fail-closed) — so the one required check covers reviews too,
+  with no separate workflow step
 
 **Never use `always()`** in the workflow or steps — cleanup, summaries, check
 finalization, and reporting all happen in normal control flow.
@@ -274,9 +278,10 @@ internally and makes the final check pass or fail.
 
 Be aware of these before adopting it to gate merges:
 
-- **Not yet run end-to-end in GitHub Actions.** Dynamic check-run creation, the
-  `Frodo CI / final` gating, review/expert enforcement, and Slack delivery are
-  implemented (`go-github`, `slack-go`) but unproven against a live run.
+- **Live runs are new.** The framework now executes in GitHub Actions — dynamic
+  check-runs, the `Frodo CI / final` gate, review/expert enforcement (inside
+  `run`), security, and Slack — but it is freshly exercised, not yet
+  battle-hardened. Treat early runs with care and report issues.
 - **Security scanning enforces.** It selects the scans per change type, runs the
   tool (semgrep/gitleaks/trivy/hadolint), parses SARIF, and **blocks** on findings
   per the module's profile (`fail_on_new_critical`, secrets, blocking rulesets),

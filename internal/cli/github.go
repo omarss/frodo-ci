@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -96,14 +97,50 @@ func (a *App) runReview(ctx context.Context) error {
 		return nil
 	}
 
+	outcome, err := a.evaluateReviews(ctx, loaded, gh)
+	if err != nil {
+		return err
+	}
+	printReviewOutcome(a.Out, outcome)
+	if !outcome.Satisfied {
+		return ErrExitQuiet
+	}
+	return nil
+}
+
+// ReviewOutcome is the result of evaluating a PR's review requirements across
+// modules. Evaluated is false when there is no pull-request context, so reviews
+// do not apply (e.g. a push to the default branch).
+type ReviewOutcome struct {
+	Evaluated bool
+	Satisfied bool
+	Modules   []ModuleReview
+}
+
+// ModuleReview is one module's review-gate status.
+type ModuleReview struct {
+	Module  string
+	OK      bool
+	Expert  string
+	Missing []string
+}
+
+// gateReviews evaluates review requirements when running inside a pull request,
+// so the single Frodo CI gate enforces them. Outside a PR it returns
+// Evaluated=false and never blocks.
+func (a *App) gateReviews(ctx context.Context, loaded *plan.Loaded) (ReviewOutcome, error) {
+	gh := github.FromEnv()
+	if !gh.Enabled() || !gh.HasPR() {
+		return ReviewOutcome{}, nil
+	}
 	return a.evaluateReviews(ctx, loaded, gh)
 }
 
-func (a *App) evaluateReviews(ctx context.Context, loaded *plan.Loaded, gh github.Context) error {
+func (a *App) evaluateReviews(ctx context.Context, loaded *plan.Loaded, gh github.Context) (ReviewOutcome, error) {
 	client := github.NewClient(ctx, gh)
 	raw, err := client.ListReviews(ctx)
 	if err != nil {
-		return fmt.Errorf("list reviews: %w", err)
+		return ReviewOutcome{Evaluated: true}, fmt.Errorf("list reviews: %w", err)
 	}
 	history := make([]reviews.ReviewWithTime, 0, len(raw))
 	for _, r := range raw {
@@ -115,8 +152,7 @@ func (a *App) evaluateReviews(ctx context.Context, loaded *plan.Loaded, gh githu
 	windowDays := loaded.Root.Experts.Window.Duration().Hours() / 24
 	since := time.Now().Add(-loaded.Root.Experts.Window.Duration())
 
-	failed := false
-	fmt.Fprintln(a.Out)
+	out := ReviewOutcome{Evaluated: true, Satisfied: true}
 	for _, m := range loaded.Modules {
 		rule, ok := m.Config.Reviews["default"]
 		if !ok {
@@ -135,19 +171,29 @@ func (a *App) evaluateReviews(ctx context.Context, loaded *plan.Loaded, gh githu
 			RequireAfterLatestCommit: loaded.Root.Reviews.RequireApprovalAfterLatestCommit,
 		}
 		satisfied, missing := reviews.Evaluate(requirementOf(rule.Require), in)
-		status := "ok"
 		if !satisfied {
-			status, failed = "NEEDS REVIEW", true
+			out.Satisfied = false
 		}
-		fmt.Fprintf(a.Out, "%-24s [%s] expert=%s\n", m.Name, status, orNone(expert))
-		for _, mm := range missing {
-			fmt.Fprintf(a.Out, "    - %s\n", mm)
+		out.Modules = append(out.Modules, ModuleReview{
+			Module: m.Name, OK: satisfied, Expert: expert, Missing: missing,
+		})
+	}
+	return out, nil
+}
+
+// printReviewOutcome renders the standalone `review` command's output.
+func printReviewOutcome(w io.Writer, o ReviewOutcome) {
+	fmt.Fprintln(w)
+	for _, m := range o.Modules {
+		status := "ok"
+		if !m.OK {
+			status = "NEEDS REVIEW"
+		}
+		fmt.Fprintf(w, "%-24s [%s] expert=%s\n", m.Module, status, orNone(m.Expert))
+		for _, mm := range m.Missing {
+			fmt.Fprintf(w, "    - %s\n", mm)
 		}
 	}
-	if failed {
-		return ErrExitQuiet
-	}
-	return nil
 }
 
 func (a *App) resolveExpert(ctx context.Context, client *github.Client, loaded *plan.Loaded, dir, author string, since time.Time, windowDays float64) string {

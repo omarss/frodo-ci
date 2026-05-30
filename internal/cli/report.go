@@ -18,8 +18,8 @@ import (
 // publishReport renders the run summary (what failed, why it ran, how to fix)
 // to the GitHub step summary and, on a pull request, upserts it as a single PR
 // comment so failures are obvious without digging through logs.
-func (a *App) publishReport(ctx context.Context, loaded *plan.Loaded, p *plan.Plan, res *runner.Result) {
-	md := report.BuildComment(a.buildReportInput(loaded, p, res))
+func (a *App) publishReport(ctx context.Context, loaded *plan.Loaded, p *plan.Plan, res *runner.Result, review ReviewOutcome) {
+	md := report.BuildComment(a.buildReportInput(loaded, p, res, review))
 
 	if path := os.Getenv("GITHUB_STEP_SUMMARY"); path != "" {
 		if f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
@@ -36,7 +36,7 @@ func (a *App) publishReport(ctx context.Context, loaded *plan.Loaded, p *plan.Pl
 	}
 }
 
-func (a *App) buildReportInput(loaded *plan.Loaded, p *plan.Plan, res *runner.Result) report.Input {
+func (a *App) buildReportInput(loaded *plan.Loaded, p *plan.Plan, res *runner.Result, review ReviewOutcome) report.Input {
 	reasons := map[string][]string{}
 	for _, m := range p.Modules {
 		for _, s := range m.Stages {
@@ -73,7 +73,13 @@ func (a *App) buildReportInput(loaded *plan.Loaded, p *plan.Plan, res *runner.Re
 		}
 		stages = append(stages, sr)
 	}
-	return report.Input{SHA: github.FromEnv().SHA, Stages: stages}
+	var reviewReports []report.ReviewReport
+	for _, m := range review.Modules {
+		reviewReports = append(reviewReports, report.ReviewReport{
+			Module: m.Module, OK: m.OK, Missing: m.Missing,
+		})
+	}
+	return report.Input{SHA: github.FromEnv().SHA, Stages: stages, Reviews: reviewReports}
 }
 
 func ownerMentions(loaded *plan.Loaded, module string) []string {
