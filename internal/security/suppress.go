@@ -9,9 +9,14 @@ import (
 
 // Finding is a single security finding to be classified or suppressed.
 type Finding struct {
-	RuleID   string
-	Path     string
-	Severity string
+	RuleID       string
+	Path         string
+	Line         int
+	Severity     string // critical | high | medium | low | "" (unknown)
+	Message      string
+	Tool         string
+	Kind         ScanType
+	FixAvailable bool
 }
 
 // IsSuppressed reports whether an active suppression covers the finding. A

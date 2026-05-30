@@ -40,6 +40,7 @@ type Catalog struct {
 	SecurityBaselineVersion int
 	Suppressions            *config.Suppressions
 	SuppressionsPath        string
+	Rulesets                *config.Rulesets
 	LintRules               *config.LintRules
 	LintRulesVersion        int
 	PerformanceBudgets      *config.PerformanceBudgets
@@ -175,6 +176,10 @@ func loadCatalog(repoRoot string, root *config.RootConfig) *Catalog {
 	if sup, src, err := config.LoadSuppressions(filepath.Join(base, "security", "suppressions.yml")); err == nil {
 		c.Suppressions, c.SuppressionsPath = sup, src.Path
 		c.sources = append(c.sources, kindedSource{schema.KindSuppressions, src})
+	}
+	if rs, src, err := config.LoadRulesets(filepath.Join(base, "security", "rulesets.yml")); err == nil {
+		c.Rulesets = rs
+		c.sources = append(c.sources, kindedSource{schema.KindRulesets, src})
 	}
 	if lr, src, err := config.LoadLintRules(filepath.Join(base, "lint", "rules.yml")); err == nil {
 		c.LintRules, c.LintRulesVersion = lr, lr.Version
