@@ -119,3 +119,31 @@ func TestReplaceActionRef(t *testing.T) {
 		t.Error("non-frodo actions must be untouched")
 	}
 }
+
+func TestSyncWorkflowEnv(t *testing.T) {
+	root := t.TempDir()
+	wf := strings.Join([]string{
+		"jobs:", "  final:", "    timeout-minutes: 90",
+		envMarkerStart, "    # placeholder", envMarkerEnd,
+		"    steps:",
+		setupMarkerStart, setupMarkerEnd,
+	}, "\n")
+	mustWrite(t, filepath.Join(root, ".github/workflows/frodo-ci.yml"), wf)
+	mustWrite(t, filepath.Join(root, ".github/frodo-ci.yml"),
+		"version: 1\nworkflow:\n  env:\n    NODE_OPTIONS: \"--max-old-space-size=4096\"\n")
+
+	app := &App{RepoRoot: root, Out: io.Discard}
+	if err := app.runSyncWorkflow(false, ""); err != nil {
+		t.Fatalf("sync-workflow: %v", err)
+	}
+	data, _ := os.ReadFile(filepath.Join(root, ".github/workflows/frodo-ci.yml"))
+	got := string(data)
+	for _, want := range []string{"    env:", `NODE_OPTIONS: "--max-old-space-size=4096"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("env block missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "# placeholder") {
+		t.Error("placeholder should have been replaced by the env block")
+	}
+}
