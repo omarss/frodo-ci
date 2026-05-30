@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,18 +52,21 @@ type toolchain struct {
 
 func newSyncWorkflowCommand(app *App) *cobra.Command {
 	var check bool
+	var actionRef string
 	cmd := &cobra.Command{
 		Use:   "sync-workflow",
-		Short: "Regenerate the workflow's toolchain setup from modules' setup: blocks",
-		Long: "Unions every module's declared `setup:` toolchains, picks the highest version per tool, and " +
-			"rewrites the managed setup section of " + workflowRelPath + " using maintained, SHA-pinned setup-* actions.",
-		RunE: func(_ *cobra.Command, _ []string) error { return app.runSyncWorkflow(check) },
+		Short: "Regenerate the workflow's toolchain setup (and optionally the action ref)",
+		Long: "Regenerates the managed setup section of " + workflowRelPath + " from repo metadata and modules' " +
+			"`setup:` blocks using SHA-pinned setup-* actions. With --action-ref it also pins the Frodo CI " +
+			"action `uses:` ref, so the version can be bumped via CLI and drift-checked with --check.",
+		RunE: func(_ *cobra.Command, _ []string) error { return app.runSyncWorkflow(check, actionRef) },
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "fail if the workflow is out of sync instead of writing it")
+	cmd.Flags().StringVar(&actionRef, "action-ref", "", "pin the Frodo CI action `uses:` ref (e.g. omarss/frodo-ci@v1.10.0)")
 	return cmd
 }
 
-func (a *App) runSyncWorkflow(check bool) error {
+func (a *App) runSyncWorkflow(check bool, actionRef string) error {
 	path, original, updated, unknown, err := a.renderManagedWorkflow()
 	if err != nil {
 		return err
@@ -70,18 +74,33 @@ func (a *App) runSyncWorkflow(check bool) error {
 	for _, u := range unknown {
 		fmt.Fprintf(a.Out, "warning: no setup action for toolchain %q — add its setup step manually\n", u)
 	}
+	updated = replaceActionRef(updated, actionRef)
 	if updated == original {
-		fmt.Fprintln(a.Out, "workflow already in sync with repo toolchains")
+		fmt.Fprintln(a.Out, "workflow already in sync")
 		return nil
 	}
 	if check {
-		return fmt.Errorf("%s is out of sync with repo toolchains — run `frodo-ci sync-workflow`", workflowRelPath)
+		return fmt.Errorf("%s is out of sync — run `frodo-ci sync-workflow`", workflowRelPath)
 	}
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
 		return err
 	}
 	fmt.Fprintf(a.Out, "updated %s\n", workflowRelPath)
 	return nil
+}
+
+// reFrodoAction matches the Frodo CI action reference line
+// (uses: <owner>/frodo-ci@<ref>), capturing the "uses:" prefix.
+var reFrodoAction = regexp.MustCompile(`(?m)^(\s*uses:\s*)\S*/frodo-ci@\S+`)
+
+// replaceActionRef pins the Frodo CI action `uses:` ref to the given value,
+// leaving the rest of the workflow (and other actions) untouched. An empty ref
+// is a no-op.
+func replaceActionRef(workflow, ref string) string {
+	if ref == "" {
+		return workflow
+	}
+	return reFrodoAction.ReplaceAllString(workflow, "${1}"+ref)
 }
 
 // renderManagedWorkflow regenerates the workflow's setup block from repo metadata

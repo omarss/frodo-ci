@@ -61,7 +61,7 @@ func TestSyncWorkflowDetectsVersions(t *testing.T) {
 	mustWrite(t, filepath.Join(root, "apps/web/src/x.txt"), "x\n")
 
 	app := &App{RepoRoot: root, Out: io.Discard}
-	if err := app.runSyncWorkflow(false); err != nil {
+	if err := app.runSyncWorkflow(false, ""); err != nil {
 		t.Fatalf("sync-workflow: %v", err)
 	}
 	data, err := os.ReadFile(filepath.Join(root, ".github/workflows/frodo-ci.yml"))
