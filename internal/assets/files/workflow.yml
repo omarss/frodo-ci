@@ -71,9 +71,11 @@ jobs:
       # Restore the fingerprint cache so unchanged stages stay skipped. Split
       # restore/save (not the combined cache action) so the cache is still saved
       # when a stage fails -- Frodo writes cache entries for passed stages only,
-      # so a failed run never persists a failure. Keyed per ref (branch) with a
-      # global fallback, so each branch reuses its own lineage first. The cache
-      # lives outside the workspace (survives checkout). It never skips scan/CD/reviews.
+      # so a failed run never persists a failure. Keyed per ref (branch); the
+      # restore-keys fall back first to this branch's own lineage, then to the
+      # base branch (so a brand-new PR inherits main's warm fingerprints/outputs
+      # and only runs its delta), then to any cache. The cache lives outside the
+      # workspace (survives checkout). It never skips scan/CD/reviews.
       - name: Frodo CI cache directory
         shell: bash
         run: echo "FRODO_CI_CACHE_DIR=$HOME/.cache/frodo-ci" >> "$GITHUB_ENV"
@@ -85,6 +87,7 @@ jobs:
           key: frodo-ci-cache-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
             frodo-ci-cache-${{ github.ref_name }}-
+            frodo-ci-cache-${{ github.base_ref }}-
             frodo-ci-cache-
 
       # Restore the language package stores (pnpm, Maven) so dependency install
@@ -103,6 +106,7 @@ jobs:
           key: frodo-ci-toolchains-${{ github.ref_name }}-${{ hashFiles('**/pnpm-lock.yaml', '**/pom.xml') }}
           restore-keys: |
             frodo-ci-toolchains-${{ github.ref_name }}-
+            frodo-ci-toolchains-${{ github.base_ref }}-
             frodo-ci-toolchains-
 
       - name: Run Frodo CI
