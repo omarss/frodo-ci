@@ -39,8 +39,16 @@ type StageReport struct {
 
 // Input is everything needed to render the summary.
 type Input struct {
-	SHA    string
-	Stages []StageReport
+	SHA     string
+	Stages  []StageReport
+	Reviews []ReviewReport
+}
+
+// ReviewReport is one module's review-gate status (owner/expert/team approvals).
+type ReviewReport struct {
+	Module  string
+	OK      bool
+	Missing []string // human-readable unmet requirements
 }
 
 func (s StageReport) ok() bool      { return s.Status == "success" }
@@ -49,7 +57,7 @@ func (s StageReport) blocked() bool { return s.Status == "cancelled" }
 func (s StageReport) failed() bool  { return !s.ok() && !s.skipped() }
 
 // breakdown renders the per-status tally, omitting empty buckets.
-func breakdown(failed, blocked, skipped, passed int) string {
+func breakdown(failed, blocked, skipped, passed, reviewsUnmet int) string {
 	var parts []string
 	add := func(n int, label string) {
 		if n > 0 {
@@ -60,7 +68,22 @@ func breakdown(failed, blocked, skipped, passed int) string {
 	add(blocked, "blocked")
 	add(skipped, "skipped")
 	add(passed, "passed")
+	add(reviewsUnmet, "review unmet")
 	return "**" + strings.Join(parts, " · ") + "**"
+}
+
+// renderReviews lists the modules whose review requirements are unmet. It is
+// shown prominently (not collapsed): an unmet review is a merge blocker.
+func renderReviews(b *strings.Builder, unmet []ReviewReport) {
+	fmt.Fprintf(b, "\n### 🔒 Review required (%d)\n\n", len(unmet))
+	b.WriteString("Checks can pass, but merging is blocked until these approvals land:\n\n")
+	for _, r := range unmet {
+		miss := strings.Join(r.Missing, "; ")
+		if miss == "" {
+			miss = "approval required"
+		}
+		fmt.Fprintf(b, "- `%s` — %s\n", r.Module, miss)
+	}
 }
 
 // renderBlocked lists the cancelled (cascade) stages compactly, grouped by
@@ -131,19 +154,27 @@ func BuildComment(in Input) string {
 			pass++
 		}
 	}
+	var reviewsUnmet []ReviewReport
+	for _, r := range in.Reviews {
+		if !r.OK {
+			reviewsUnmet = append(reviewsUnmet, r)
+		}
+	}
 
 	var b strings.Builder
 	b.WriteString(Marker + "\n")
 	switch {
-	case len(hardFailed) == 0 && len(blocked) == 0:
+	case len(hardFailed) == 0 && len(blocked) == 0 && len(reviewsUnmet) == 0:
 		fmt.Fprintf(&b, "## ✅ Frodo CI — all %d check(s) passed\n", pass)
-	case len(hardFailed) == 0:
-		fmt.Fprintf(&b, "## ❌ Frodo CI — run cancelled, %d stage(s) blocked\n", len(blocked))
-	default:
+	case len(hardFailed) > 0:
 		fmt.Fprintf(&b, "## ❌ Frodo CI — %d of %d check(s) failed\n", len(hardFailed), len(in.Stages))
+	case len(blocked) > 0:
+		fmt.Fprintf(&b, "## ❌ Frodo CI — run cancelled, %d stage(s) blocked\n", len(blocked))
+	default: // checks passed but review requirements are unmet
+		fmt.Fprintf(&b, "## ❌ Frodo CI — %d review requirement(s) not met\n", len(reviewsUnmet))
 	}
-	if len(hardFailed) > 0 || len(blocked) > 0 {
-		fmt.Fprintf(&b, "\n%s\n", breakdown(len(hardFailed), len(blocked), skipped, pass))
+	if len(hardFailed) > 0 || len(blocked) > 0 || len(reviewsUnmet) > 0 {
+		fmt.Fprintf(&b, "\n%s\n", breakdown(len(hardFailed), len(blocked), skipped, pass, len(reviewsUnmet)))
 	}
 	if in.SHA != "" {
 		fmt.Fprintf(&b, "\n**Commit:** `%s`\n", short(in.SHA))
@@ -193,6 +224,9 @@ func BuildComment(in Input) string {
 		}
 	}
 
+	if len(reviewsUnmet) > 0 {
+		renderReviews(&b, reviewsUnmet)
+	}
 	if len(blocked) > 0 {
 		renderBlocked(&b, blocked, uniqueModules(hardFailed))
 	}
