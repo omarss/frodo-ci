@@ -66,6 +66,38 @@ func TestBuildCommentSuccess(t *testing.T) {
 	}
 }
 
+func TestBuildCommentSeparatesBlockedFromFailed(t *testing.T) {
+	in := Input{
+		SHA: "fc821134fe3d",
+		Stages: []StageReport{
+			{Module: "nestjs-grpc-clients", Stage: "validate", Status: "failure",
+				FailedStep: "Typecheck", FailReason: "exit 254", Hint: "Run your formatter.",
+				Duration: 234 * time.Second},
+			{Module: "business-api", Stage: "build", Status: "cancelled"},
+			{Module: "business-api", Stage: "test", Status: "cancelled"},
+			{Module: "internal-api", Stage: "validate", Status: "cancelled"},
+		},
+	}
+	out := BuildComment(in)
+	for _, want := range []string{
+		"1 of 4 check(s) failed",                 // only the real failure is counted
+		"**1 failed · 3 blocked**",               // truthful breakdown
+		"### ❌ `nestjs-grpc-clients` · validate", // root cause first, full detail
+		"Typecheck (exit 254)",
+		"Blocked (3)",                     // cascade collapsed into one section
+		"depend on `nestjs-grpc-clients`", // pointing at the cause
+		"`business-api` — build, test",    // grouped per module
+		"`internal-api` — validate",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q\n---\n%s", want, out)
+		}
+	}
+	if n := strings.Count(out, "### ❌"); n != 1 {
+		t.Errorf("want exactly 1 root-cause block, got %d", n)
+	}
+}
+
 func TestCacheSummaryLine(t *testing.T) {
 	in := Input{Stages: []StageReport{
 		{Module: "a", Stage: "validate", Status: "success", Duration: 2 * time.Second},
@@ -75,7 +107,7 @@ func TestCacheSummaryLine(t *testing.T) {
 	}}
 	out := BuildComment(in)
 	for _, want := range []string{
-		"⚡", "skipped 2 of 4 stage(s) via cache", "saved ~2m0s",
+		"⚡", "reused 2 of 4 stage(s) from cache", "saved ~2m0s",
 		"slowest:", "`b` · package", "(5s)",
 	} {
 		if !strings.Contains(out, want) {
