@@ -49,6 +49,7 @@ func (a *App) buildReportInput(loaded *plan.Loaded, p *plan.Plan, res *runner.Re
 			Module: s.Module, Stage: s.Stage, Status: string(s.Status),
 			Note: s.Note, Duration: s.Duration, Reasons: reasons[s.Module+"/"+s.Stage],
 			Owners: ownerMentions(loaded, s.Module), Env: s.Env,
+			Cached: s.Cached, Saved: s.Saved,
 		}
 		if step := lastFailedStep(s.Steps); step != nil {
 			sr.FailedStep = step.Name

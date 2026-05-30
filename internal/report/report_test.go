@@ -66,6 +66,24 @@ func TestBuildCommentSuccess(t *testing.T) {
 	}
 }
 
+func TestCacheSummaryLine(t *testing.T) {
+	in := Input{Stages: []StageReport{
+		{Module: "a", Stage: "validate", Status: "success", Duration: 2 * time.Second},
+		{Module: "a", Stage: "test", Status: "skipped", Cached: true, Saved: 90 * time.Second},
+		{Module: "b", Stage: "build", Status: "skipped", Cached: true, Saved: 30 * time.Second},
+		{Module: "b", Stage: "package", Status: "success", Duration: 5 * time.Second},
+	}}
+	out := BuildComment(in)
+	for _, want := range []string{
+		"⚡", "skipped 2 of 4 stage(s) via cache", "saved ~2m0s",
+		"slowest:", "`b` · package", "(5s)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("cache line missing %q\n---\n%s", want, out)
+		}
+	}
+}
+
 func TestReproduceIsRunnable(t *testing.T) {
 	in := Input{Stages: []StageReport{{
 		Module: "api", Stage: "package", Status: "failure",
