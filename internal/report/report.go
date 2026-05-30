@@ -33,6 +33,8 @@ type StageReport struct {
 	ReproduceCmd string            // the exact command to re-run
 	Env          map[string]string // resolved FRODO_* env, so reproduce is runnable
 	Duration     time.Duration
+	Cached       bool          // skipped via an exact fingerprint cache hit
+	Saved        time.Duration // wall-clock the cache hit avoided
 }
 
 // Input is everything needed to render the summary.
@@ -67,6 +69,9 @@ func BuildComment(in Input) string {
 	}
 	if in.SHA != "" {
 		fmt.Fprintf(&b, "\n**Commit:** `%s`\n", short(in.SHA))
+	}
+	if line := cacheSummary(in.Stages); line != "" {
+		b.WriteString("\n" + line)
 	}
 
 	for _, s := range failed {
@@ -125,6 +130,53 @@ func BuildComment(in Input) string {
 	b.WriteString("\n</details>\n")
 	b.WriteString("\n<sub>Frodo CI — updates on each push. Run <code>frodo-ci plan</code> to preview locally.</sub>\n")
 	return b.String()
+}
+
+// cacheSummary renders the cache ROI line: how many stages a fingerprint hit
+// skipped, the wall-clock that saved, and the slowest stage that actually ran (a
+// free bottleneck pointer). Returns "" when nothing ran and nothing was cached.
+func cacheSummary(stages []StageReport) string {
+	var cached, total int
+	var saved time.Duration
+	var slowest StageReport
+	for _, s := range stages {
+		total++
+		if s.Cached {
+			cached++
+			saved += s.Saved
+			continue
+		}
+		if s.Duration > slowest.Duration {
+			slowest = s
+		}
+	}
+	if cached == 0 && slowest.Duration == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("⚡ **Cache:** ")
+	if cached > 0 {
+		fmt.Fprintf(&b, "skipped %d of %d stage(s) via cache", cached, total)
+		if saved > 0 {
+			fmt.Fprintf(&b, " — saved ~%s", dur(saved))
+		}
+	} else {
+		fmt.Fprintf(&b, "0 of %d stage(s) skipped", total)
+	}
+	if slowest.Duration > 0 {
+		fmt.Fprintf(&b, "; slowest: `%s` · %s (%s)", slowest.Module, slowest.Stage, dur(slowest.Duration))
+	}
+	b.WriteString("\n")
+	return b.String()
+}
+
+// dur formats a duration for humans: minute-resolution stages round to seconds
+// (e.g. 7m58s), shorter ones keep millisecond precision.
+func dur(d time.Duration) string {
+	if d >= time.Minute {
+		return d.Round(time.Second).String()
+	}
+	return d.Round(time.Millisecond).String()
 }
 
 // reproduceScript builds a literally-runnable reproduce: it exports the resolved

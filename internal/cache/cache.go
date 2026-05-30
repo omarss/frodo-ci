@@ -21,6 +21,9 @@ type Entry struct {
 	Conclusion  string   `json:"conclusion"`
 	SavedAtUnix int64    `json:"saved_at_unix"`
 	Outputs     []string `json:"outputs,omitempty"`
+	// DurationMs is how long the stage took when it last ran, so a later cache
+	// hit can report the time it saved.
+	DurationMs int64 `json:"duration_ms,omitempty"`
 }
 
 // Cache stores and looks up fingerprint entries.

@@ -43,6 +43,8 @@ type StageResult struct {
 	// RestoredOutputs is true when a cache hit restored the stage's build outputs
 	// to disk (so dependents reuse them instead of rebuilding).
 	RestoredOutputs bool `json:"restored_outputs,omitempty"`
+	// Saved is the wall-clock a cache hit avoided (the stage's last run duration).
+	Saved time.Duration `json:"saved,omitempty"`
 	// Env is the resolved FRODO_* (and stage) environment the steps ran with, so
 	// failure reporting can produce a literally-runnable reproduce command.
 	Env map[string]string `json:"env,omitempty"`
@@ -272,6 +274,11 @@ func (r *Runner) runStage(ctx context.Context, p *plan.Plan, s *plan.StagePlan, 
 		sr.Status = StatusSkipped
 		sr.Cached = true
 		sr.Note = "unchanged (cache hit)"
+		if r.opts.Cache != nil {
+			if e, ok, _ := r.opts.Cache.Restore(s.Fingerprint); ok {
+				sr.Saved = time.Duration(e.DurationMs) * time.Millisecond
+			}
+		}
 		if len(eff.Outputs) > 0 && r.opts.Cache != nil {
 			moduleDir := filepath.Join(r.loaded.RepoRoot, filepath.FromSlash(m.Dir))
 			if restored, err := r.opts.Cache.RestoreOutputs(s.Fingerprint, moduleDir); err == nil && restored {
@@ -340,7 +347,7 @@ func (r *Runner) runStage(ctx context.Context, p *plan.Plan, s *plan.StagePlan, 
 		_ = r.opts.Cache.Save(cache.Entry{
 			Fingerprint: s.Fingerprint, Module: s.Module, Stage: s.Stage,
 			Conclusion: string(StatusSuccess), SavedAtUnix: time.Now().Unix(),
-			Outputs: eff.Outputs,
+			Outputs: eff.Outputs, DurationMs: sr.Duration.Milliseconds(),
 		})
 		// Archive the build artifacts keyed by fingerprint so a later hit -- here
 		// or on another runner -- restores them instead of rebuilding.
