@@ -152,6 +152,14 @@ func (m *Matcher) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // Date is a calendar date (YYYY-MM-DD) used for suppression expiry.
 type Date struct{ time.Time }
 
+// MarshalYAML emits the date as YYYY-MM-DD (or null when unset).
+func (d Date) MarshalYAML() (interface{}, error) {
+	if d.IsZero() {
+		return nil, nil
+	}
+	return d.Format("2006-01-02"), nil
+}
+
 // UnmarshalYAML accepts a YYYY-MM-DD (or RFC3339) scalar.
 func (d *Date) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var v interface{}
