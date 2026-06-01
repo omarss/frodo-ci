@@ -138,6 +138,11 @@ jobs:
             "https://github.com/hadolint/hadolint/releases/download/${hl}/hadolint-Linux-x86_64"
           sudo chmod +x /usr/local/bin/hadolint
 
+      # >>> frodo-ci:registries
+      # Registry logins from root config `registries:`; managed by `frodo-ci
+      # sync-workflow`. Runs before build/push so credentials come from repo
+      # vars/secrets, not this file.
+      # <<< frodo-ci:registries
       - name: Run Frodo CI
         uses: omarss/frodo-ci@v1
         with:

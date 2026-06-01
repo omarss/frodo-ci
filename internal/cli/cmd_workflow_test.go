@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/omarss/frodo-ci/internal/config"
 )
 
 func TestVersionLess(t *testing.T) {
@@ -145,5 +147,29 @@ func TestSyncWorkflowEnv(t *testing.T) {
 	}
 	if strings.Contains(got, "# placeholder") {
 		t.Error("placeholder should have been replaced by the env block")
+	}
+}
+
+func TestRenderRegistriesBlock(t *testing.T) {
+	out := renderRegistriesBlock([]config.Registry{
+		{Host: "me-central2-docker.pkg.dev", Auth: "gcp-wif",
+			WorkloadIdentityProviderVar: "GCP_WIF_PROVIDER", ServiceAccountVar: "GCP_WIF_SA"},
+		{Host: "ghcr.io", Auth: "ghcr"},
+		{Host: "docker.io", Auth: "docker", UsernameVar: "DOCKER_USER", PasswordVar: "DOCKER_PASS"},
+		{Host: "weird.io", Auth: "bogus"},
+	})
+	for _, want := range []string{
+		"google-github-actions/auth@", "vars.GCP_WIF_PROVIDER", "vars.GCP_WIF_SA",
+		"gcloud auth configure-docker me-central2-docker.pkg.dev",
+		"docker/login-action@", "registry: ghcr.io", "secrets.GITHUB_TOKEN",
+		"registry: docker.io", "secrets.DOCKER_USER", "secrets.DOCKER_PASS",
+		`unsupported auth "bogus"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("registries block missing %q:\n%s", want, out)
+		}
+	}
+	if !strings.Contains(renderRegistriesBlock(nil), "no registry") {
+		t.Error("empty registries should render the placeholder comment")
 	}
 }

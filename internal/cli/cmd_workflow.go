@@ -20,7 +20,13 @@ const (
 	setupMarkerEnd   = "# <<< frodo-ci:setup"
 	envMarkerStart   = "# >>> frodo-ci:env"
 	envMarkerEnd     = "# <<< frodo-ci:env"
+	regMarkerStart   = "# >>> frodo-ci:registries"
+	regMarkerEnd     = "# <<< frodo-ci:registries"
 	workflowRelPath  = ".github/workflows/frodo-ci.yml"
+
+	// Pinned auth actions for the generated registry-login steps.
+	gcpAuthAction     = "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3"
+	dockerLoginAction = "docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0"
 )
 
 // setupAction describes how to provision a toolchain via a maintained, SHA-pinned
@@ -129,6 +135,12 @@ func (a *App) renderManagedWorkflow() (path, original, updated string, unknown [
 	// case job-level env is simply not managed (no error).
 	if strings.Contains(upd, envMarkerStart) {
 		upd, err = replaceEnvBlock(upd, renderEnvBlock(loaded.Root.Workflow.Env))
+		if err != nil {
+			return path, string(data), "", unk, err
+		}
+	}
+	if strings.Contains(upd, regMarkerStart) {
+		upd, err = replaceRegistriesBlock(upd, renderRegistriesBlock(loaded.Root.Registries))
 		if err != nil {
 			return path, string(data), "", unk, err
 		}
@@ -246,6 +258,42 @@ func replaceSetupBlock(workflow, block string) (string, error) {
 
 func replaceEnvBlock(workflow, block string) (string, error) {
 	return replaceMarkedBlock(workflow, envMarkerStart, envMarkerEnd, block)
+}
+
+func replaceRegistriesBlock(workflow, block string) (string, error) {
+	return replaceMarkedBlock(workflow, regMarkerStart, regMarkerEnd, block)
+}
+
+// renderRegistriesBlock renders the managed registry-login steps (6-space
+// indented, step level) from root config `registries:`, using SHA-pinned auth
+// actions. Credentials are referenced from repo vars/secrets, never inlined.
+func renderRegistriesBlock(regs []config.Registry) string {
+	header := "      # Registry logins from root config `registries:`; managed by `frodo-ci sync-workflow`."
+	if len(regs) == 0 {
+		return header + "\n      # (no registry declared)"
+	}
+	var b strings.Builder
+	b.WriteString(header)
+	for _, r := range regs {
+		switch r.Auth {
+		case "gcp-wif":
+			fmt.Fprintf(&b, "\n      - name: Authenticate to %s\n        uses: %s\n        with:\n"+
+				"          workload_identity_provider: ${{ vars.%s }}\n          service_account: ${{ vars.%s }}\n"+
+				"      - name: Configure Docker for %s\n        shell: bash\n        run: gcloud auth configure-docker %s --quiet",
+				r.Host, gcpAuthAction, r.WorkloadIdentityProviderVar, r.ServiceAccountVar, r.Host, r.Host)
+		case "ghcr":
+			fmt.Fprintf(&b, "\n      - name: Log in to %s\n        uses: %s\n        with:\n"+
+				"          registry: %s\n          username: ${{ github.actor }}\n          password: ${{ secrets.GITHUB_TOKEN }}",
+				r.Host, dockerLoginAction, r.Host)
+		case "docker":
+			fmt.Fprintf(&b, "\n      - name: Log in to %s\n        uses: %s\n        with:\n"+
+				"          registry: %s\n          username: ${{ secrets.%s }}\n          password: ${{ secrets.%s }}",
+				r.Host, dockerLoginAction, r.Host, r.UsernameVar, r.PasswordVar)
+		default:
+			fmt.Fprintf(&b, "\n      # registry %s: unsupported auth %q — add its login step manually", r.Host, r.Auth)
+		}
+	}
+	return b.String()
 }
 
 // replaceMarkedBlock swaps the lines between a marker pair, keeping the marker
