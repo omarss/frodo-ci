@@ -18,6 +18,7 @@ type RootConfig struct {
 	Performance    RootPerformance `yaml:"performance,omitempty" json:"performance,omitempty"`
 	Slack          SlackConfig     `yaml:"slack,omitempty" json:"slack,omitempty"`
 	Workflow       WorkflowConfig  `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	Registries     []Registry      `yaml:"registries,omitempty" json:"registries,omitempty"`
 	ProtectedFiles []ProtectedFile `yaml:"protected_files,omitempty" json:"protected_files,omitempty"`
 }
 
@@ -27,6 +28,21 @@ type WorkflowConfig struct {
 	// Env is job-level environment for the generated workflow's job (e.g.
 	// NODE_OPTIONS=--max-old-space-size=4096), emitted by `frodo-ci sync-workflow`.
 	Env map[string]FlexStr `yaml:"env,omitempty" json:"env,omitempty"`
+}
+
+// Registry declares a container registry the generated workflow logs into before
+// build/push, so credentials live in repo vars/secrets, not the workflow YAML.
+// Auth is one of: gcp-wif (Workload Identity Federation), ghcr (GITHUB_TOKEN), or
+// docker (username/password from secrets).
+type Registry struct {
+	Host string `yaml:"host" json:"host"`
+	Auth string `yaml:"auth" json:"auth"`
+	// gcp-wif: the repo var names holding the WIF provider and service account.
+	WorkloadIdentityProviderVar string `yaml:"workload_identity_provider_var,omitempty" json:"workload_identity_provider_var,omitempty"`
+	ServiceAccountVar           string `yaml:"service_account_var,omitempty" json:"service_account_var,omitempty"`
+	// docker: the repo secret names holding the username and password.
+	UsernameVar string `yaml:"username_var,omitempty" json:"username_var,omitempty"`
+	PasswordVar string `yaml:"password_var,omitempty" json:"password_var,omitempty"`
 }
 
 // ScanConfig bounds which paths Frodo CI considers when discovering modules.

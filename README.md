@@ -300,6 +300,11 @@ Be aware of these before adopting it to gate merges:
   template defaults, and include any toolchain the repo clearly uses. So a repo on
   Node 24 + pnpm 10.34.1 gets exactly that, no hand-editing. `--check` fails CI if
   the workflow drifts.
+- **Registry auth is declarative.** Declare `registries:` (`gcp-wif` Workload
+  Identity Federation / `ghcr` / `docker`) in the root config and `sync-workflow`
+  generates SHA-pinned login steps that read credentials from repo vars/secrets —
+  no hand-added auth steps. The job's `id-token: write` permission is already set
+  for WIF.
 - **GitHub/Slack features need credentials** (`GITHUB_TOKEN`, `SLACK_WEBHOOK_URL`)
   and a PR context to do anything; locally they degrade gracefully.
 
