@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,8 +30,9 @@ func detectToolchains(root string) detectedToolchains {
 	d := detectedToolchains{tools: map[string]string{}}
 
 	pkg := readRootPackageJSON(root)
-	if pkg != nil || fileExists(root, ".nvmrc") || fileExists(root, ".node-version") {
-		d.tools["node"] = detectNodeVersion(root, pkg)
+	nodeVer := detectNodeVersion(root)
+	if pkg != nil || nodeVer != "" || fileExists(root, ".nvmrc") || fileExists(root, ".node-version") {
+		d.tools["node"] = nodeVer
 	}
 	if pkg != nil {
 		d.pnpm = pnpmFromPackageManager(pkg.PackageManager)
@@ -66,21 +68,51 @@ func fileExists(root, rel string) bool {
 	return err == nil
 }
 
-func detectNodeVersion(root string, pkg *rootPackage) string {
+func detectNodeVersion(root string) string {
 	for _, f := range []string{".node-version", ".nvmrc"} {
 		if v := firstLineVersion(root, f); v != "" {
-			return v
+			return v // an explicit version file is authoritative
 		}
 	}
-	if pkg != nil {
-		if e := pkg.Engines["node"]; e != "" {
-			// engines.node is a range like ">=24" or "^24.1"; take the major.
-			if m := reFirstVersion.FindString(e); m != "" {
-				return m
+	// Otherwise aggregate engines.node across every package.json (root and
+	// workspace sub-packages), taking the highest required major -- a workspace
+	// often pins Node in sub-packages, not at the root.
+	return maxEnginesNode(root)
+}
+
+// maxEnginesNode walks every package.json (skipping heavy/irrelevant dirs) and
+// returns the highest engines.node version any of them requires.
+func maxEnginesNode(root string) string {
+	best := ""
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case "node_modules", ".git", "dist", "target", "vendor":
+				return filepath.SkipDir
 			}
+			return nil
 		}
-	}
-	return ""
+		if d.Name() != "package.json" {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		var p rootPackage
+		if json.Unmarshal(data, &p) != nil {
+			return nil
+		}
+		// engines.node is a range like ">=24" or "^24.1"; take the major.
+		if v := reFirstVersion.FindString(p.Engines["node"]); v != "" && (best == "" || versionLess(best, v)) {
+			best = v
+		}
+		return nil
+	})
+	return best
 }
 
 // firstLineVersion reads the first line of a version file (.nvmrc / .node-version
