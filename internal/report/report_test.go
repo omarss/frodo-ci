@@ -128,6 +128,24 @@ func TestBuildCommentReviewsBlock(t *testing.T) {
 	}
 }
 
+func TestBuildCommentUnsatisfiableReview(t *testing.T) {
+	in := Input{
+		Stages: []StageReport{{Module: "internal-api", Stage: "validate", Status: "success"}},
+		Reviews: []ReviewReport{{
+			Module: "internal-api", OK: false, Unsatisfiable: true,
+			Missing:   []string{"owner approval required, but owner team(s) @platform are empty or unknown — unsatisfiable"},
+			Reviewers: []string{"@platform"},
+		}},
+	}
+	out := BuildComment(in)
+	if !strings.Contains(out, "⛔") || !strings.Contains(out, "empty or unknown") {
+		t.Errorf("unsatisfiable review should be marked ⛔ with the diagnosis:\n%s", out)
+	}
+	if strings.Contains(out, "review requested") {
+		t.Error("an unsatisfiable (misconfigured) review must not claim a review was requested")
+	}
+}
+
 func TestCacheSummaryLine(t *testing.T) {
 	in := Input{Stages: []StageReport{
 		{Module: "a", Stage: "validate", Status: "success", Duration: 2 * time.Second},

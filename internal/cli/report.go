@@ -84,6 +84,7 @@ func (a *App) buildReportInput(loaded *plan.Loaded, p *plan.Plan, res *runner.Re
 		}
 		reviewReports = append(reviewReports, report.ReviewReport{
 			Module: m.Module, OK: m.OK, Missing: m.Missing, Reviewers: reviewers,
+			Unsatisfiable: m.Unsatisfiable,
 		})
 	}
 	return report.Input{SHA: github.FromEnv().SHA, Stages: stages, Reviews: reviewReports}
