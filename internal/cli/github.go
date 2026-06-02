@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -127,6 +128,9 @@ type ModuleReview struct {
 	Missing      []string
 	RequestTeams []string // team slugs to request as reviewers
 	RequestUsers []string // user logins to request (the expert)
+	// Unsatisfiable is true when a required team is empty/unknown, so the gate can
+	// never go green until the config is fixed (distinct from "waiting for review").
+	Unsatisfiable bool
 }
 
 // gateReviews evaluates review requirements when running inside a pull request,
@@ -163,13 +167,14 @@ func (a *App) evaluateReviews(ctx context.Context, loaded *plan.Loaded, gh githu
 			continue
 		}
 		expert := a.resolveExpert(ctx, client, loaded, m.Dir, gh.PRAuthor, since, windowDays)
-		owners := a.ownerLogins(ctx, client, m.Config.Owners.Teams)
+		owners, badOwnerTeams := a.resolveTeams(ctx, client, m.Config.Owners.Teams)
+		teamMembers := a.teamMembers(ctx, client, rule.Require.Teams)
 		in := reviews.Inputs{
 			Author:                   gh.PRAuthor,
 			Reviews:                  states,
 			Owners:                   owners,
 			Expert:                   expert,
-			TeamMembers:              a.teamMembers(ctx, client, rule.Require.Teams),
+			TeamMembers:              teamMembers,
 			IgnoreAuthor:             loaded.Root.Reviews.IgnoreAuthorApproval,
 			IgnoreBots:               loaded.Root.Reviews.IgnoreBotApproval,
 			RequireAfterLatestCommit: loaded.Root.Reviews.RequireApprovalAfterLatestCommit,
@@ -179,13 +184,23 @@ func (a *App) evaluateReviews(ctx context.Context, loaded *plan.Loaded, gh githu
 		mr := ModuleReview{Module: m.Name, OK: satisfied, Expert: expert, Missing: missing}
 		if !satisfied {
 			out.Satisfied = false
-			// Resolve who can unblock it: owner teams when owner approvals are
-			// short, required teams that are short, and the expert when needed.
 			sug := reviews.Suggest(req, in)
-			if sug.OwnersShort {
-				mr.RequestTeams = append(mr.RequestTeams, m.Config.Owners.Teams...)
+			// Distinguish "waiting for a human" from "can never be satisfied": when
+			// a required team is empty/unknown, say so instead of "needs approval".
+			emptyReq := emptyTeams(req.Teams, teamMembers)
+			if diag := reviewDiagnostics(req, len(owners) > 0, badOwnerTeams, emptyReq); len(diag) > 0 {
+				mr.Missing = append(mr.Missing, diag...)
+				mr.Unsatisfiable = true
 			}
-			mr.RequestTeams = append(mr.RequestTeams, sug.TeamsShort...)
+			// Request only teams that actually resolve (an unknown team 422s).
+			if sug.OwnersShort {
+				mr.RequestTeams = append(mr.RequestTeams, resolvable(m.Config.Owners.Teams, badOwnerTeams)...)
+			}
+			for _, t := range sug.TeamsShort {
+				if !inList(emptyReq, t) {
+					mr.RequestTeams = append(mr.RequestTeams, t)
+				}
+			}
 			if sug.ExpertNeeded && sug.ExpertLogin != "" && sug.ExpertLogin != gh.PRAuthor {
 				mr.RequestUsers = append(mr.RequestUsers, sug.ExpertLogin)
 			}
@@ -282,18 +297,78 @@ func (a *App) resolveExpert(ctx context.Context, client *github.Client, loaded *
 	return expert
 }
 
-func (a *App) ownerLogins(ctx context.Context, client *github.Client, teams []string) map[string]bool {
-	out := map[string]bool{}
+// resolveTeams returns the union of the teams' members and the teams GitHub can't
+// resolve to any member (the team is unknown, empty, or inaccessible) -- so a
+// requirement naming only those can never be satisfied.
+func (a *App) resolveTeams(ctx context.Context, client *github.Client, teams []string) (map[string]bool, []string) {
+	members := map[string]bool{}
+	var unresolvable []string
 	for _, t := range teams {
-		members, err := client.ListTeamMembers(ctx, t)
-		if err != nil {
+		ms, err := client.ListTeamMembers(ctx, t)
+		if err != nil || len(ms) == 0 {
+			unresolvable = append(unresolvable, t)
 			continue
 		}
-		for _, m := range members {
-			out[m] = true
+		for _, m := range ms {
+			members[m] = true
+		}
+	}
+	return members, unresolvable
+}
+
+// emptyTeams returns the required teams (count > 0) that resolved to no members.
+func emptyTeams(req map[string]int, members map[string][]string) []string {
+	var out []string
+	for t, n := range req {
+		if n > 0 && len(members[t]) == 0 {
+			out = append(out, t)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// reviewDiagnostics produces the distinct "unsatisfiable" messages when a
+// required role's teams are empty/unknown, so a misconfiguration reads
+// differently from a pending human review.
+func reviewDiagnostics(req reviews.Requirement, ownersResolved bool, badOwnerTeams, emptyReqTeams []string) []string {
+	var out []string
+	if req.Owners > 0 && !ownersResolved && len(badOwnerTeams) > 0 {
+		out = append(out, fmt.Sprintf(
+			"owner approval required, but owner team(s) %s are empty or unknown — unsatisfiable; fix owners.teams or grant the team repo access",
+			joinAt(badOwnerTeams)))
+	}
+	for _, t := range emptyReqTeams {
+		out = append(out, fmt.Sprintf("team @%s is empty or unknown — its required approval is unsatisfiable", t))
+	}
+	return out
+}
+
+func resolvable(all, bad []string) []string {
+	var out []string
+	for _, t := range all {
+		if !inList(bad, t) {
+			out = append(out, t)
 		}
 	}
 	return out
+}
+
+func inList(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func joinAt(teams []string) string {
+	q := make([]string, len(teams))
+	for i, t := range teams {
+		q[i] = "@" + t
+	}
+	return strings.Join(q, ", ")
 }
 
 func (a *App) teamMembers(ctx context.Context, client *github.Client, teams map[string]int) map[string][]string {

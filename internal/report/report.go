@@ -46,10 +46,11 @@ type Input struct {
 
 // ReviewReport is one module's review-gate status (owner/expert/team approvals).
 type ReviewReport struct {
-	Module    string
-	OK        bool
-	Missing   []string // human-readable unmet requirements
-	Reviewers []string // handles who should review (e.g. @platform, @charlie)
+	Module        string
+	OK            bool
+	Missing       []string // human-readable unmet requirements
+	Reviewers     []string // handles who should review (e.g. @platform, @charlie)
+	Unsatisfiable bool     // a required team is empty/unknown — config must be fixed
 }
 
 func (s StageReport) ok() bool      { return s.Status == "success" }
@@ -82,6 +83,11 @@ func renderReviews(b *strings.Builder, unmet []ReviewReport) {
 		miss := strings.Join(r.Missing, "; ")
 		if miss == "" {
 			miss = "approval required"
+		}
+		if r.Unsatisfiable {
+			// A misconfiguration, not a pending human review: don't claim a request.
+			fmt.Fprintf(b, "- ⛔ `%s` — %s\n", r.Module, miss)
+			continue
 		}
 		fmt.Fprintf(b, "- `%s` — %s\n", r.Module, miss)
 		if len(r.Reviewers) > 0 {
