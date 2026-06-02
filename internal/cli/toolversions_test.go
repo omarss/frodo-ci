@@ -78,3 +78,22 @@ func TestSyncWorkflowDetectsVersions(t *testing.T) {
 		t.Errorf("module's node 22 should be overridden by engines.node 24:\n%s", got)
 	}
 }
+
+func TestDetectNodeFromWorkspacePackages(t *testing.T) {
+	root := t.TempDir()
+	// Root pins pnpm but NOT engines.node (the reported case); sub-packages pin it.
+	mustWrite(t, filepath.Join(root, "package.json"),
+		`{"name":"root","private":true,"packageManager":"pnpm@10.34.1","workspaces":["apps/*"]}`)
+	mustWrite(t, filepath.Join(root, "apps/a/package.json"), `{"name":"@x/a","engines":{"node":">=24"}}`)
+	mustWrite(t, filepath.Join(root, "apps/b/package.json"), `{"name":"@x/b","engines":{"node":">=20"}}`)
+	// node_modules must be ignored (would otherwise win with a bogus high version).
+	mustWrite(t, filepath.Join(root, "node_modules/dep/package.json"), `{"engines":{"node":">=99"}}`)
+
+	d := detectToolchains(root)
+	if d.tools["node"] != "24" {
+		t.Errorf("node = %q, want 24 (max engines across sub-packages, node_modules ignored)", d.tools["node"])
+	}
+	if d.pnpm != "10.34.1" {
+		t.Errorf("pnpm = %q, want 10.34.1", d.pnpm)
+	}
+}
